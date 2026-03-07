@@ -6,7 +6,6 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // 개발 중에는 Vite가 백엔드로 프록시
       "/api": {
         target: "http://localhost:4000",
         changeOrigin: true,

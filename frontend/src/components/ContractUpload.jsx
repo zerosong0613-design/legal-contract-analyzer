@@ -1,5 +1,11 @@
 import { useState, useRef } from "react";
 
+const ACCEPTED_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
+
 export default function ContractUpload({ onAnalyze, loading, error }) {
   const [mode, setMode] = useState("paste");
   const [text, setText] = useState("");
@@ -9,7 +15,10 @@ export default function ContractUpload({ onAnalyze, loading, error }) {
 
   const handleFile = (f) => {
     if (!f) return;
-    if (f.type !== "application/pdf") { alert("PDF 파일만 지원됩니다."); return; }
+    if (!ACCEPTED_TYPES.includes(f.type)) {
+      alert("PDF 또는 Word(.doc/.docx) 파일만 지원됩니다.");
+      return;
+    }
     setFile(f);
   };
 
@@ -19,27 +28,38 @@ export default function ContractUpload({ onAnalyze, loading, error }) {
     onAnalyze(mode === "paste" ? { text } : { file });
   };
 
+  const fileIcon = (f) => {
+    if (!f) return "📎";
+    if (f.type === "application/pdf") return "📕";
+    return "📘";
+  };
+
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
       {/* Mode toggle */}
-      <div className="flex gap-1 bg-slate-950 rounded-xl p-1">
-        {[["paste", "📋 텍스트 붙여넣기"], ["upload", "📄 PDF 첨부"]].map(([m, lbl]) => (
-          <button key={m} onClick={() => setMode(m)}
+      <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+        {[["paste", "📋 텍스트 붙여넣기"], ["upload", "📎 파일 첨부 (PDF/Word)"]].map(([m, lbl]) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
             className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-              mode === m ? "bg-indigo-600 text-white" : "text-slate-500 hover:text-slate-300"
-            }`}>
+              mode === m
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
             {lbl}
           </button>
         ))}
       </div>
 
-      {/* Input */}
+      {/* Input area */}
       {mode === "paste" ? (
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="계약서 전문을 여기에 붙여넣기 하세요..."
-          className="w-full h-52 bg-slate-950 border border-slate-700 rounded-xl p-4 text-sm text-slate-200 placeholder-slate-600 resize-y outline-none focus:border-indigo-500 transition-colors"
+          className="w-full h-52 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm text-slate-700 placeholder-slate-400 resize-y outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
         />
       ) : (
         <div
@@ -47,35 +67,56 @@ export default function ContractUpload({ onAnalyze, loading, error }) {
           onDragLeave={() => setDragOver(false)}
           onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
           onClick={() => fileRef.current.click()}
-          className={`h-44 border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors ${
-            dragOver ? "border-indigo-500 bg-indigo-950/30" : "border-slate-700 hover:border-slate-500"
-          }`}>
-          <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={(e) => handleFile(e.target.files[0])} />
+          className={`h-48 border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer transition-all ${
+            dragOver
+              ? "border-indigo-400 bg-indigo-50"
+              : "border-slate-300 hover:border-indigo-300 hover:bg-slate-50"
+          }`}
+        >
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".pdf,.doc,.docx"
+            className="hidden"
+            onChange={(e) => handleFile(e.target.files[0])}
+          />
           {file ? (
-            <><div className="text-3xl">✅</div><p className="text-cyan-400 text-sm font-medium">{file.name}</p></>
+            <>
+              <div className="text-4xl">{fileIcon(file)}</div>
+              <p className="text-indigo-600 text-sm font-semibold">{file.name}</p>
+              <p className="text-slate-400 text-xs">클릭하여 다른 파일 선택</p>
+            </>
           ) : (
-            <><div className="text-3xl">📄</div><p className="text-slate-500 text-sm">PDF 파일을 드래그하거나 클릭하여 첨부</p></>
+            <>
+              <div className="text-4xl">📎</div>
+              <p className="text-slate-600 text-sm font-medium">파일을 드래그하거나 클릭하여 업로드</p>
+              <p className="text-slate-400 text-xs">지원 형식: PDF · Word (.doc / .docx)</p>
+            </>
           )}
         </div>
       )}
 
+      {/* Error */}
       {error && (
-        <div className="bg-red-950/50 border border-red-800 rounded-lg px-4 py-3 text-red-300 text-sm">
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-red-600 text-sm">
           ⚠️ {error}
         </div>
       )}
 
+      {/* Submit */}
       <button
         onClick={handleSubmit}
         disabled={loading || (mode === "paste" ? !text.trim() : !file)}
-        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-sm font-bold transition-colors"
+        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-colors shadow-sm"
       >
         {loading ? (
           <span className="flex items-center justify-center gap-2">
             <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             분석 중...
           </span>
-        ) : "⚖️ 계약서 분석하기"}
+        ) : (
+          "⚖️ 계약서 분석하기"
+        )}
       </button>
     </div>
   );
