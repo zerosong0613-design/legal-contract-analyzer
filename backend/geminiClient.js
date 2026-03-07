@@ -7,7 +7,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
  * - gemini-1.5-pro : 긴 문서 분석에 적합 (최대 1M 토큰)
  */
 function getModel() {
-  return genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+  return genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 }
 
 module.exports = { getModel };
