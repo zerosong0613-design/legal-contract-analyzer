@@ -9,19 +9,30 @@ const PROMPT_TEMPLATE = fs.readFileSync(
   "utf-8"
 );
 
-async function analyzeContract({ fileBuffer, mimetype, text }) {
+function isWordFile(mimetype, originalname) {
+  if (
+    mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mimetype === "application/msword"
+  ) return true;
+  // 확장자로 추가 체크 (브라우저 MIME 오인식 대응)
+  if (originalname) {
+    const ext = originalname.toLowerCase();
+    if (ext.endsWith(".docx") || ext.endsWith(".doc")) return true;
+  }
+  return false;
+}
+
+async function analyzeContract({ fileBuffer, mimetype, originalname, text }) {
   let contractText = text || "";
 
   if (fileBuffer) {
-    const isPdf = mimetype === "application/pdf";
-    const isWord =
-      mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      mimetype === "application/msword";
+    const isPdf = mimetype === "application/pdf" ||
+      (originalname && originalname.toLowerCase().endsWith(".pdf"));
 
     if (isPdf) {
       const parsed = await pdf(fileBuffer);
       contractText = parsed.text;
-    } else if (isWord) {
+    } else if (isWordFile(mimetype, originalname)) {
       const result = await mammoth.extractRawText({ buffer: fileBuffer });
       contractText = result.value;
     } else {
