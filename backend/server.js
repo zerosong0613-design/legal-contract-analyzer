@@ -17,13 +17,14 @@ app.post("/api/analyze", upload.single("file"), async (req, res) => {
   try {
     const fileBuffer = req.file?.buffer || null;
     const mimetype = req.file?.mimetype || null;
+    const originalname = req.file?.originalname || null;
     const text = req.body?.text || null;
 
     if (!fileBuffer && !text) {
       return res.status(400).json({ error: "파일 또는 텍스트를 전송해 주세요." });
     }
 
-    const result = await analyzeContract({ fileBuffer, mimetype, text });
+    const result = await analyzeContract({ fileBuffer, mimetype, originalname, text });
     res.json({ ok: true, data: result });
   } catch (err) {
     console.error("[analyzeContract error]", err);
