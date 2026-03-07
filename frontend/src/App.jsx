@@ -3,12 +3,36 @@ import ContractUpload from "./components/ContractUpload";
 import ContractResult from "./components/ContractResult";
 import Dashboard from "./components/Dashboard";
 
+const STORAGE_KEY = "contractlens_records";
+
+function loadRecords() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecords(records) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+  } catch {
+    console.warn("localStorage 저장 실패");
+  }
+}
+
 export default function App() {
   const [tab, setTab] = useState("analyze");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const [records, setRecords] = useState([]);
+  const [records, setRecords] = useState(() => loadRecords());
+
+  const updateRecords = (newRecords) => {
+    setRecords(newRecords);
+    saveRecords(newRecords);
+  };
 
   const handleAnalyze = async ({ file, text }) => {
     setLoading(true);
@@ -42,18 +66,23 @@ export default function App() {
   };
 
   const addToLog = (record) => {
-    setRecords((prev) => [
-      ...prev,
+    const newRecords = [
+      ...records,
       { ...record, id: Date.now(), date: new Date().toISOString().slice(0, 10) },
-    ]);
+    ];
+    updateRecords(newRecords);
     setResult(null);
     setTab("dashboard");
+  };
+
+  const removeRecord = (id) => {
+    updateRecords(records.filter((r) => r.id !== id));
   };
 
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-6 py-0 flex items-center justify-between h-14 sticky top-0 z-10 shadow-sm">
+      <header className="bg-white border-b border-slate-200 px-6 flex items-center justify-between h-14 sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-base">⚖️</div>
           <div>
@@ -89,10 +118,7 @@ export default function App() {
           </div>
         )}
         {tab === "dashboard" && (
-          <Dashboard
-            records={records}
-            onRemove={(id) => setRecords((p) => p.filter((r) => r.id !== id))}
-          />
+          <Dashboard records={records} onRemove={removeRecord} />
         )}
       </main>
     </div>
