@@ -1,10 +1,20 @@
 import { useState, useRef } from "react";
 
-const ACCEPTED_TYPES = [
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-];
+const ACCEPTED_EXTENSIONS = [".pdf", ".doc", ".docx"];
+
+function isAcceptedFile(file) {
+  if (!file) return false;
+  // 확장자로 체크 (MIME 타입이 틀려도 통과)
+  const name = file.name.toLowerCase();
+  return ACCEPTED_EXTENSIONS.some((ext) => name.endsWith(ext));
+}
+
+function fileIcon(file) {
+  if (!file) return "📎";
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf")) return "📕";
+  return "📘";
+}
 
 export default function ContractUpload({ onAnalyze, loading, error }) {
   const [mode, setMode] = useState("paste");
@@ -15,7 +25,7 @@ export default function ContractUpload({ onAnalyze, loading, error }) {
 
   const handleFile = (f) => {
     if (!f) return;
-    if (!ACCEPTED_TYPES.includes(f.type)) {
+    if (!isAcceptedFile(f)) {
       alert("PDF 또는 Word(.doc/.docx) 파일만 지원됩니다.");
       return;
     }
@@ -26,12 +36,6 @@ export default function ContractUpload({ onAnalyze, loading, error }) {
     if (mode === "paste" && !text.trim()) return;
     if (mode === "upload" && !file) return;
     onAnalyze(mode === "paste" ? { text } : { file });
-  };
-
-  const fileIcon = (f) => {
-    if (!f) return "📎";
-    if (f.type === "application/pdf") return "📕";
-    return "📘";
   };
 
   return (
@@ -76,7 +80,7 @@ export default function ContractUpload({ onAnalyze, loading, error }) {
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,.doc,.docx"
+            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             className="hidden"
             onChange={(e) => handleFile(e.target.files[0])}
           />
@@ -96,14 +100,12 @@ export default function ContractUpload({ onAnalyze, loading, error }) {
         </div>
       )}
 
-      {/* Error */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-red-600 text-sm">
           ⚠️ {error}
         </div>
       )}
 
-      {/* Submit */}
       <button
         onClick={handleSubmit}
         disabled={loading || (mode === "paste" ? !text.trim() : !file)}
