@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import { useState } from "react";
 
 const GRADE_STYLE = {
   L1: "bg-green-100 text-green-800 border-green-300",
@@ -17,73 +17,59 @@ function Badge({ grade }) {
   );
 }
 
-function exportToExcel(records) {
-  const wb = XLSX.utils.book_new();
-
-  // ① 기본 로그
-  const headers = ["날짜","계약명","거래상대방","계약유형","등급(L)","등급(R)","리스크유형","계약금액(백만원)","담당자","완료여부","Risk_Type_1","Risk_Type_2","Risk_Type_3"];
-  const rows = records.map(r => [
-    r.date, r.title, r.counterparty, r.contract_type,
-    r.lead_grade, r.risk_grade, r.risk_type_1, r.amount || 0,
-    r.assignee || "", "완료",
-    r.risk_type_1, r.risk_type_2 || "", r.risk_type_3 || "",
-  ]);
-  const ws1 = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  ws1["!cols"] = [10,30,20,15,8,8,15,15,12,10,15,15,15].map(w => ({ wch: w }));
-  XLSX.utils.book_append_sheet(wb, ws1, "① 기본로그");
-
-  // ② R3 가치 기록
-  const r3 = records.filter(r => r.risk_grade === "R3");
-  const ws2 = XLSX.utils.aoa_to_sheet([
-    ["날짜","계약명","금액(백만원)","상대방","종합의견","개선수준","보고대상"],
-    ...r3.map(r => [r.date, r.title, r.amount || 0, r.counterparty, r.summary || "", "1_방어", "Y"]),
-  ]);
-  XLSX.utils.book_append_sheet(wb, ws2, "② R3 가치기록");
-
-  // ③ 분기 성과 요약
-  const byL = { L1: 0, L2: 0, L3: 0 };
-  const byR = { R1: 0, R2: 0, R3: 0 };
-  const tags = {};
-  records.forEach(r => {
-    if (byL[r.lead_grade] !== undefined) byL[r.lead_grade]++;
-    if (byR[r.risk_grade] !== undefined) byR[r.risk_grade]++;
-    [r.risk_type_1, r.risk_type_2, r.risk_type_3].filter(Boolean).forEach(t => {
-      tags[t] = (tags[t] || 0) + 1;
-    });
-  });
-  const ws3 = XLSX.utils.aoa_to_sheet([
-    ["분기 성과 요약"], ["전체 계약", records.length], [],
-    ["리드타임 등급"], ["L1", byL.L1], ["L2", byL.L2], ["L3", byL.L3], [],
-    ["리스크 등급"], ["R1", byR.R1], ["R2", byR.R2], ["R3", byR.R3], [],
-    ["리스크 태그", "건수"],
-    ...Object.entries(tags).sort((a, b) => b[1] - a[1]),
-  ]);
-  XLSX.utils.book_append_sheet(wb, ws3, "③ 분기성과요약");
-
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  XLSX.writeFile(wb, `법무팀_계약성과관리_${date}.xlsx`);
-}
-
 export default function Dashboard({ records, onRemove }) {
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
+
   const byL = { L1: 0, L2: 0, L3: 0 };
   const byR = { R1: 0, R2: 0, R3: 0 };
   records.forEach(r => {
     if (byL[r.lead_grade] !== undefined) byL[r.lead_grade]++;
     if (byR[r.risk_grade] !== undefined) byR[r.risk_grade]++;
   });
+
+  const handleExport = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/export`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ records }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "내보내기 실패");
+      }
+
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      a.href     = url;
+      a.download = `법무팀_계약성과관리_${today}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setExportError(e.message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-7 gap-2">
         {[
-          { label: "전체", val: records.length, color: "text-indigo-600" },
-          { label: "L1", val: byL.L1, color: "text-green-600" },
-          { label: "L2", val: byL.L2, color: "text-amber-600" },
-          { label: "L3", val: byL.L3, color: "text-red-600" },
-          { label: "R1", val: byR.R1, color: "text-green-600" },
-          { label: "R2", val: byR.R2, color: "text-amber-600" },
-          { label: "R3", val: byR.R3, color: "text-red-600" },
+          { label: "전체",  val: records.length, color: "text-indigo-600" },
+          { label: "L1",    val: byL.L1,         color: "text-green-600"  },
+          { label: "L2",    val: byL.L2,         color: "text-amber-600"  },
+          { label: "L3",    val: byL.L3,         color: "text-red-600"    },
+          { label: "R1",    val: byR.R1,         color: "text-green-600"  },
+          { label: "R2",    val: byR.R2,         color: "text-amber-600"  },
+          { label: "R3",    val: byR.R3,         color: "text-red-600"    },
         ].map(({ label, val, color }) => (
           <div key={label} className="bg-white rounded-xl border border-slate-200 p-3 text-center shadow-sm">
             <p className="text-xs text-slate-400 font-semibold">{label}</p>
@@ -138,11 +124,27 @@ export default function Dashboard({ records, onRemove }) {
             ))}
           </div>
 
+          {exportError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-red-600 text-sm">
+              ⚠️ {exportError}
+            </div>
+          )}
+
           <button
-            onClick={() => exportToExcel(records)}
-            className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center justify-center gap-2"
+            onClick={handleExport}
+            disabled={exporting}
+            className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-colors shadow-sm flex items-center justify-center gap-2"
           >
-            📊 Excel 대시보드 다운로드 ({records.length}건) → 법무팀_계약성과관리.xlsx
+            {exporting ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Excel 생성 중...
+              </>
+            ) : (
+              <>
+                📊 세련된 Excel 보고서 다운로드 ({records.length}건)
+              </>
+            )}
           </button>
         </>
       )}
