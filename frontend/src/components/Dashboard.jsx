@@ -142,7 +142,7 @@ export default function Dashboard({ records, onRemove }) {
               </>
             ) : (
               <>
-                📊 세련된 Excel 보고서 다운로드 ({records.length}건)
+                📊 법무팀 계약성과관리 Excel 다운로드 ({records.length}건)
               </>
             )}
           </button>
