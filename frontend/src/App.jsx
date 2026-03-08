@@ -172,7 +172,12 @@ export default function App() {
           <div className="space-y-0">
             {/* 결과가 없을 때만 웰컴 배너 표시 */}
             {!result && !loading && <WelcomeBanner />}
-            <ContractUpload onAnalyze={handleAnalyze} loading={loading} error={error} />
+            <ContractUpload
+                onAnalyze={handleAnalyze}
+                loading={loading}
+                error={error}
+                assigneeOptions={[...new Set(records.map(r => r.assignee).filter(Boolean))].sort()}
+              />
             {result && <div className="mt-5"><ContractResult result={result} onAddToLog={addToLog} initialAssignee={pendingAssignee} /></div>}
           </div>
         )}
