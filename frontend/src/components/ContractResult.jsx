@@ -12,19 +12,10 @@ const GRADE_STYLE = {
 
 const LEAD_LABEL = { L1: "48시간(2일) 내 검토", L2: "5일 내 검토", L3: "협의 필요" };
 const RISK_LABEL = { R1: "저위험", R2: "중위험 · 수정 권고", R3: "고위험 · 즉각 협상 필요" };
-
 const LEAD_GRADES = ["L1", "L2", "L3"];
 const RISK_GRADES = ["R1", "R2", "R3"];
 
-function Badge({ grade }) {
-  return (
-    <span className={`inline-block px-3 py-0.5 rounded-full border text-xs font-bold ${GRADE_STYLE[grade] || "bg-slate-100 text-slate-600 border-slate-300"}`}>
-      {grade}
-    </span>
-  );
-}
-
-function EditableField({ label, value, onChange, type = "text" }) {
+function EditableField({ label, value, onChange, type = "text", placeholder = "—" }) {
   return (
     <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
       <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">{label}</p>
@@ -32,8 +23,8 @@ function EditableField({ label, value, onChange, type = "text" }) {
         type={type}
         value={value || ""}
         onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
         className="w-full bg-transparent text-sm text-slate-800 font-semibold outline-none border-b border-transparent focus:border-indigo-300 transition-colors placeholder-slate-300"
-        placeholder="—"
       />
     </div>
   );
@@ -45,17 +36,13 @@ function GradeSelector({ label, value, options, onChange }) {
       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{label}</p>
       <div className="flex gap-2">
         {options.map((g) => (
-          <button
-            key={g}
-            onClick={() => onChange(g)}
+          <button key={g} onClick={() => onChange(g)}
             className={`px-3 py-1 rounded-full border text-xs font-bold transition-all ${
               value === g
                 ? `${GRADE_STYLE[g]} ring-2 ring-offset-1 ring-current`
                 : "bg-white text-slate-400 border-slate-200 hover:border-slate-300"
             }`}
-          >
-            {g}
-          </button>
+          >{g}</button>
         ))}
       </div>
       <p className="text-xs text-slate-500 mt-2">
@@ -65,8 +52,8 @@ function GradeSelector({ label, value, options, onChange }) {
   );
 }
 
-export default function ContractResult({ result, onAddToLog }) {
-  const [draft, setDraft] = useState({ ...result });
+export default function ContractResult({ result, onAddToLog, initialAssignee = "" }) {
+  const [draft, setDraft] = useState({ ...result, assignee: initialAssignee });
   const [saved, setSaved] = useState(false);
 
   const update = (key) => (val) => setDraft((d) => ({ ...d, [key]: val }));
@@ -90,7 +77,7 @@ export default function ContractResult({ result, onAddToLog }) {
     <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <div>
+        <div className="flex-1">
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">분석 결과 — 저장 전 수정 가능</p>
           <input
             value={draft.title || ""}
@@ -113,12 +100,14 @@ export default function ContractResult({ result, onAddToLog }) {
         <p className="text-xs text-amber-700">AI 분석 결과를 저장 전에 수정할 수 있습니다. 잘못된 항목이 있으면 직접 고쳐주세요.</p>
       </div>
 
-      {/* 기본 정보 편집 */}
+      {/* 기본 정보 — 당사자 포함 */}
       <div className="grid grid-cols-2 gap-3">
-        <EditableField label="상대방" value={draft.counterparty} onChange={update("counterparty")} />
+        <EditableField label="우리 측 당사자" value={draft.our_party} onChange={update("our_party")} placeholder="SK케미칼 측 표기" />
+        <EditableField label="거래상대방" value={draft.counterparty} onChange={update("counterparty")} />
         <EditableField label="계약 유형" value={draft.contract_type} onChange={update("contract_type")} />
         <EditableField label="계약 기간" value={draft.duration} onChange={update("duration")} />
-        <EditableField label="계약 금액 (백만원)" value={draft.amount > 0 ? String(draft.amount) : ""} onChange={(v) => update("amount")(Number(v) || 0)} type="number" />
+        <EditableField label="계약 금액 (백만원)" value={draft.amount > 0 ? String(draft.amount) : ""} onChange={(v) => update("amount")(Number(v) || 0)} type="number" placeholder="금액 없음" />
+        <EditableField label="담당자" value={draft.assignee} onChange={update("assignee")} placeholder="이름 입력" />
       </div>
 
       {/* 등급 선택 */}
