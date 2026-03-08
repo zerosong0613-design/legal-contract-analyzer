@@ -226,7 +226,7 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
 
   const LEAD_TARGET_MAP = { L1: 2, L2: 5, L3: null };
 
-  // Excel 내보내기
+  // Excel 내보내기 (수식 포함)
   const handleExport = () => {
     setExporting(true);
     setExportError(null);
@@ -234,101 +234,135 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
       const wb = XLSX.utils.book_new();
       const today = new Date().toLocaleDateString("ko-KR");
 
-      // ── ① 기본 로그 ──────────────────────────────────
+      // ── ① 기본 로그 (핵심 열에 Excel 수식 삽입) ─────────────────
+      // 열 배치: A=수신일 B=계약명 C=우리측 D=거래상대방 E=계약유형
+      //          F=리드타임등급 G=리스크등급 H=리스크유형 I=금액
+      //          J=회신일 K=소요영업일(수식) L=목표영업일(수식) M=달성여부(수식)
+      //          N=담당자 O=메모
+      // 헤더: 3행, 데이터 시작: 4행
+      const LOG_DATA_START_ROW = 4;
+
       const logHeaders = [
         "수신일","계약명","우리측 당사자","거래상대방","계약유형",
         "리드타임 등급","리스크 등급","리스크 유형",
         "계약금액(백만원)","회신일","소요 영업일","목표 영업일","달성 여부",
         "담당자","메모"
       ];
-      const logRows = records.map(r => {
-        const elapsed = r.reply_date && r.date ? calcWorkingDays(r.date, r.reply_date) : "";
-        const target = LEAD_TARGET_MAP[r.lead_grade];
-        let achieved = "";
-        if (elapsed !== "") {
-          if (target === null) achieved = "협의";
-          else achieved = elapsed <= target ? "달성" : `${elapsed - target}일 초과`;
-        }
+
+      const logRows = records.map((r, idx) => {
+        const row = LOG_DATA_START_ROW + idx; // 이 행의 Excel 행 번호
         return [
-          r.date || "", r.title || "", r.our_party || "SK케미칼", r.counterparty || "",
-          r.contract_type || "", r.lead_grade || "", r.risk_grade || "",
+          // A: 수신일 — Date 객체로 넘겨야 NETWORKDAYS가 인식
+          r.date ? new Date(r.date) : "",
+          r.title || "",
+          r.our_party || "SK케미칼",
+          r.counterparty || "",
+          r.contract_type || "",
+          r.lead_grade || "",   // F
+          r.risk_grade || "",   // G
           [r.risk_type_1, r.risk_type_2, r.risk_type_3].filter(Boolean).join(", "),
           r.amount > 0 ? r.amount : 0,
-          r.reply_date || "", elapsed, target ?? "협의", achieved,
-          r.assignee || "", r.memo || ""
+          // J: 회신일 — Date 객체
+          r.reply_date ? new Date(r.reply_date) : "",
+          // K: 소요 영업일 — NETWORKDAYS(수신일, 회신일)-1  ※주말 자동 제외, 양 끝 포함이라 -1
+          { f: `IF(AND(A${row}<>"",J${row}<>""),NETWORKDAYS(A${row},J${row})-1,"")` },
+          // L: 목표 영업일 — 리드타임 등급에 따라 자동
+          { f: `IF(F${row}="L1",2,IF(F${row}="L2",5,IF(F${row}="L3","협의","")))` },
+          // M: 달성 여부 — 소요<=목표면 달성, 초과면 n일 초과
+          { f: `IF(K${row}="","미회신",IF(L${row}="협의","협의완료",IF(K${row}<=L${row},"✅ 달성","❌ "&(K${row}-L${row})&"일 초과")))` },
+          r.assignee || "",
+          r.memo || ""
         ];
       });
-      const ws1 = XLSX.utils.aoa_to_sheet([
-        [`📋 계약 기본 로그 — 생성일: ${today} / 총 ${records.length}건`],
-        [],
-        logHeaders,
-        ...logRows
-      ]);
-      ws1["!cols"] = [10,28,16,16,14,8,8,20,10,10,8,8,10,14,20].map(w => ({ wch: w }));
+
+      const ws1 = XLSX.utils.aoa_to_sheet(
+        [
+          [`📋 계약 기본 로그 — 생성일: ${today} / 총 ${records.length}건`],
+          [],
+          logHeaders,
+          ...logRows,
+        ],
+        { cellDates: true }  // Date 객체를 Excel 날짜 시리얼로 변환
+      );
+
+      // 날짜 셀 서식 적용 (A열=수신일, J열=회신일)
+      records.forEach((_, idx) => {
+        const r = LOG_DATA_START_ROW + idx - 1; // encode_cell은 0-indexed
+        const aRef = XLSX.utils.encode_cell({ r, c: 0 });
+        const jRef = XLSX.utils.encode_cell({ r, c: 9 });
+        if (ws1[aRef] && ws1[aRef].v) ws1[aRef].z = "yyyy-mm-dd";
+        if (ws1[jRef] && ws1[jRef].v) ws1[jRef].z = "yyyy-mm-dd";
+      });
+
+      ws1["!cols"] = [10,28,16,16,14,8,8,20,10,10,10,10,14,14,20].map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(wb, ws1, "① 기본로그");
 
-      // ── ② 월별 통계 ──────────────────────────────────
-      const monthMap = {};
-      records.forEach(r => {
-        if (!r.date) return;
-        const m = r.date.slice(0, 7);
-        if (!monthMap[m]) monthMap[m] = { total:0, l1:0, l2:0, l3:0, r1:0, r2:0, r3:0, amount:0, replied:0, achieved:0 };
-        monthMap[m].total++;
-        if (r.lead_grade === "L1") monthMap[m].l1++;
-        if (r.lead_grade === "L2") monthMap[m].l2++;
-        if (r.lead_grade === "L3") monthMap[m].l3++;
-        if (r.risk_grade === "R1") monthMap[m].r1++;
-        if (r.risk_grade === "R2") monthMap[m].r2++;
-        if (r.risk_grade === "R3") monthMap[m].r3++;
-        monthMap[m].amount += r.amount || 0;
-        if (r.reply_date && r.date) {
-          const wd = calcWorkingDays(r.date, r.reply_date);
-          const td = LEAD_TARGET_MAP[r.lead_grade];
-          monthMap[m].replied++;
-          if (td === null || wd <= td) monthMap[m].achieved++;
-        }
-      });
+      // ── ② 월별 통계 (COUNTIFS/SUMIFS 수식으로 기본로그 참조) ──────
+      // 기본로그의 데이터 범위: A열(수신일), F열(리드타임), G열(리스크), I열(금액), J열(회신일), M열(달성여부), N열(담당자)
+      const dataEnd = LOG_DATA_START_ROW + records.length - 1;
+      const logSheet = "'① 기본로그'";
+
+      // 월 목록 추출 (중복 제거, 정렬)
+      const months = [...new Set(records.map(r => r.date?.slice(0, 7)).filter(Boolean))].sort();
+
       const monthHeaders = ["월","전체","L1","L2","L3","R1","R2","R3","금액(백만)","회신완료","달성","달성률"];
-      const monthRows = Object.keys(monthMap).sort().map(m => {
-        const v = monthMap[m];
-        const rate = v.replied > 0 ? `${Math.round(v.achieved/v.replied*100)}%` : "-";
-        return [m, v.total, v.l1, v.l2, v.l3, v.r1, v.r2, v.r3, v.amount, v.replied, v.achieved, rate];
+      // 헤더: 3행, 데이터 시작: 4행
+      const MONTH_DATA_START = 4;
+      const monthRows = months.map((m, idx) => {
+        const row = MONTH_DATA_START + idx;
+        const ym = m; // "2026-03" 형식
+        // 해당 월 판별: TEXT(수신일,"yyyy-mm")=A{row} 대신 YEAR/MONTH로
+        const yearStr = ym.slice(0, 4);
+        const monStr  = String(parseInt(ym.slice(5, 7)));
+        const crit    = `${logSheet}!$A$${LOG_DATA_START_ROW}:$A$${dataEnd}`;
+        const critYr  = `">="&DATE(${yearStr},${monStr},1),"<"&DATE(${yearStr},${monStr}+1,1)`;
+        return [
+          m,
+          { f: `COUNTIFS(${crit},">="&DATE(${yearStr},${monStr},1),${crit},"<"&DATE(${yearStr},${monStr}+1,1))` },
+          { f: `COUNTIFS(${crit},">="&DATE(${yearStr},${monStr},1),${crit},"<"&DATE(${yearStr},${monStr}+1,1),${logSheet}!$F$${LOG_DATA_START_ROW}:$F$${dataEnd},"L1")` },
+          { f: `COUNTIFS(${crit},">="&DATE(${yearStr},${monStr},1),${crit},"<"&DATE(${yearStr},${monStr}+1,1),${logSheet}!$F$${LOG_DATA_START_ROW}:$F$${dataEnd},"L2")` },
+          { f: `COUNTIFS(${crit},">="&DATE(${yearStr},${monStr},1),${crit},"<"&DATE(${yearStr},${monStr}+1,1),${logSheet}!$F$${LOG_DATA_START_ROW}:$F$${dataEnd},"L3")` },
+          { f: `COUNTIFS(${crit},">="&DATE(${yearStr},${monStr},1),${crit},"<"&DATE(${yearStr},${monStr}+1,1),${logSheet}!$G$${LOG_DATA_START_ROW}:$G$${dataEnd},"R1")` },
+          { f: `COUNTIFS(${crit},">="&DATE(${yearStr},${monStr},1),${crit},"<"&DATE(${yearStr},${monStr}+1,1),${logSheet}!$G$${LOG_DATA_START_ROW}:$G$${dataEnd},"R2")` },
+          { f: `COUNTIFS(${crit},">="&DATE(${yearStr},${monStr},1),${crit},"<"&DATE(${yearStr},${monStr}+1,1),${logSheet}!$G$${LOG_DATA_START_ROW}:$G$${dataEnd},"R3")` },
+          { f: `SUMIFS(${logSheet}!$I$${LOG_DATA_START_ROW}:$I$${dataEnd},${crit},">="&DATE(${yearStr},${monStr},1),${crit},"<"&DATE(${yearStr},${monStr}+1,1))` },
+          { f: `COUNTIFS(${crit},">="&DATE(${yearStr},${monStr},1),${crit},"<"&DATE(${yearStr},${monStr}+1,1),${logSheet}!$J$${LOG_DATA_START_ROW}:$J$${dataEnd},"<>")` },
+          { f: `COUNTIFS(${crit},">="&DATE(${yearStr},${monStr},1),${crit},"<"&DATE(${yearStr},${monStr}+1,1),${logSheet}!$M$${LOG_DATA_START_ROW}:$M$${dataEnd},"✅ 달성")` },
+          { f: `IF(J${row}>0,TEXT(K${row}/J${row},"0%"),"-")` },
+        ];
       });
+
       const ws2 = XLSX.utils.aoa_to_sheet([
-        [`📅 월별 성과 분석 — 생성일: ${today}`], [],
+        [`📅 월별 성과 분석 — 생성일: ${today} (기본로그 수식 연동)`], [],
         monthHeaders, ...monthRows
       ]);
       ws2["!cols"] = [10,6,6,6,6,6,6,6,10,8,6,8].map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(wb, ws2, "② 월별 성과분석");
 
-      // ── ③ 담당자별 통계 ──────────────────────────────
-      const assigneeMap = {};
-      records.forEach(r => {
-        const a = r.assignee || "미지정";
-        if (!assigneeMap[a]) assigneeMap[a] = { total:0, l1:0, l2:0, l3:0, r1:0, r2:0, r3:0, amount:0, replied:0, achieved:0 };
-        assigneeMap[a].total++;
-        if (r.lead_grade === "L1") assigneeMap[a].l1++;
-        if (r.lead_grade === "L2") assigneeMap[a].l2++;
-        if (r.lead_grade === "L3") assigneeMap[a].l3++;
-        if (r.risk_grade === "R1") assigneeMap[a].r1++;
-        if (r.risk_grade === "R2") assigneeMap[a].r2++;
-        if (r.risk_grade === "R3") assigneeMap[a].r3++;
-        assigneeMap[a].amount += r.amount || 0;
-        if (r.reply_date && r.date) {
-          const wd = calcWorkingDays(r.date, r.reply_date);
-          const td = LEAD_TARGET_MAP[r.lead_grade];
-          assigneeMap[a].replied++;
-          if (td === null || wd <= td) assigneeMap[a].achieved++;
-        }
-      });
+      // ── ③ 담당자별 통계 ──────────────────────────────────────────
+      const assignees = [...new Set(records.map(r => r.assignee || "미지정"))].sort();
       const aHeaders = ["담당자","전체","L1","L2","L3","R1","R2","R3","금액(백만)","회신완료","달성","달성률"];
-      const aRows = Object.keys(assigneeMap).sort().map(a => {
-        const v = assigneeMap[a];
-        const rate = v.replied > 0 ? `${Math.round(v.achieved/v.replied*100)}%` : "-";
-        return [a, v.total, v.l1, v.l2, v.l3, v.r1, v.r2, v.r3, v.amount, v.replied, v.achieved, rate];
+      const ASSIGN_DATA_START = 4;
+      const aRows = assignees.map((a, idx) => {
+        const row = ASSIGN_DATA_START + idx;
+        const nameCrit = `${logSheet}!$N$${LOG_DATA_START_ROW}:$N$${dataEnd}`;
+        return [
+          a,
+          { f: `COUNTIF(${nameCrit},"${a}")` },
+          { f: `COUNTIFS(${nameCrit},"${a}",${logSheet}!$F$${LOG_DATA_START_ROW}:$F$${dataEnd},"L1")` },
+          { f: `COUNTIFS(${nameCrit},"${a}",${logSheet}!$F$${LOG_DATA_START_ROW}:$F$${dataEnd},"L2")` },
+          { f: `COUNTIFS(${nameCrit},"${a}",${logSheet}!$F$${LOG_DATA_START_ROW}:$F$${dataEnd},"L3")` },
+          { f: `COUNTIFS(${nameCrit},"${a}",${logSheet}!$G$${LOG_DATA_START_ROW}:$G$${dataEnd},"R1")` },
+          { f: `COUNTIFS(${nameCrit},"${a}",${logSheet}!$G$${LOG_DATA_START_ROW}:$G$${dataEnd},"R2")` },
+          { f: `COUNTIFS(${nameCrit},"${a}",${logSheet}!$G$${LOG_DATA_START_ROW}:$G$${dataEnd},"R3")` },
+          { f: `SUMIF(${nameCrit},"${a}",${logSheet}!$I$${LOG_DATA_START_ROW}:$I$${dataEnd})` },
+          { f: `COUNTIFS(${nameCrit},"${a}",${logSheet}!$J$${LOG_DATA_START_ROW}:$J$${dataEnd},"<>")` },
+          { f: `COUNTIFS(${nameCrit},"${a}",${logSheet}!$M$${LOG_DATA_START_ROW}:$M$${dataEnd},"✅ 달성")` },
+          { f: `IF(J${row}>0,TEXT(K${row}/J${row},"0%"),"-")` },
+        ];
       });
       const ws3 = XLSX.utils.aoa_to_sheet([
-        [`👤 담당자별 성과 분석 — 생성일: ${today}`], [],
+        [`👤 담당자별 성과 분석 — 생성일: ${today} (기본로그 수식 연동)`], [],
         aHeaders, ...aRows
       ]);
       ws3["!cols"] = [16,6,6,6,6,6,6,6,10,8,6,8].map(w => ({ wch: w }));
