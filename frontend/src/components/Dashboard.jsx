@@ -106,14 +106,25 @@ function EditModal({ record, onSave, onClose, assigneeOptions = [] }) {
           />
         </div>
 
-        <div>
-          <p className="text-xs text-slate-400 font-semibold mb-1">회신일 (검토 완료 후 직접 입력)</p>
-          <input
-            type="date"
-            value={draft.reply_date || ""}
-            onChange={(e) => u("reply_date")(e.target.value)}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-xs text-slate-400 font-semibold mb-1">📅 수신일</p>
+            <input
+              type="date"
+              value={draft.date || ""}
+              onChange={(e) => u("date")(e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+          <div>
+            <p className="text-xs text-slate-400 font-semibold mb-1">✅ 회신일</p>
+            <input
+              type="date"
+              value={draft.reply_date || ""}
+              onChange={(e) => u("reply_date")(e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
         </div>
 
         {/* 등급 선택 */}
@@ -141,6 +152,45 @@ function EditModal({ record, onSave, onClose, assigneeOptions = [] }) {
       </div>
     </div>
   );
+}
+
+function OverdueBadge({ date, leadGrade, replyDate }) {
+  if (replyDate) return null; // 회신 완료건은 표시 안함
+  if (!date) return null;
+  try {
+    const LEAD_TARGET = { L1: 2, L2: 5, L3: null };
+    const target = LEAD_TARGET[leadGrade];
+    if (target === null) return null; // L3 협의건 제외
+    const d0 = new Date(date);
+    const today = new Date();
+    // 오늘까지 경과 영업일 계산 (주말 제외)
+    let elapsed = 0;
+    const cur = new Date(d0);
+    cur.setDate(cur.getDate() + 1);
+    while (cur <= today) {
+      if (cur.getDay() !== 0 && cur.getDay() !== 6) elapsed++;
+      cur.setDate(cur.getDate() + 1);
+    }
+    if (elapsed > target) {
+      return (
+        <span className="text-red-500 font-semibold text-xs bg-red-50 border border-red-200 px-2 py-0.5 rounded-full animate-pulse">
+          🚨 {elapsed - target}일 초과
+        </span>
+      );
+    }
+    if (elapsed === target) {
+      return (
+        <span className="text-amber-600 font-semibold text-xs bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+          ⚠️ 오늘 마감
+        </span>
+      );
+    }
+    return (
+      <span className="text-slate-400 text-xs">
+        D-{target - elapsed}
+      </span>
+    );
+  } catch { return null; }
 }
 
 export default function Dashboard({ records, onRemove, onUpdate }) {
@@ -423,7 +473,7 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
                     {r.assignee && <span>✏️ {r.assignee}</span>}
                     {r.reply_date
                       ? <AchieveBadge recvDate={r.date} replyDate={r.reply_date} leadGrade={r.lead_grade} />
-                      : <span className="text-slate-300">회신일 미입력</span>}
+                      : <OverdueBadge date={r.date} leadGrade={r.lead_grade} replyDate={r.reply_date} />}
                     {r.memo && <span>📌 {r.memo}</span>}
                   </div>
                   {r.risk_type_1 && (

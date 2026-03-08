@@ -21,6 +21,7 @@ export default function ContractUpload({ onAnalyze, loading, error, assigneeOpti
   const [file, setFile]         = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [assignee, setAssignee] = useState("");
+  const [receivedDate, setReceivedDate] = useState(new Date().toISOString().slice(0, 10));
   const fileRef = useRef();
 
   const handleFile = (f) => {
@@ -37,6 +38,7 @@ export default function ContractUpload({ onAnalyze, loading, error, assigneeOpti
     if (mode === "upload" && !file) return;
     const payload = mode === "paste" ? { text } : { file };
     if (assignee.trim()) payload.assignee = assignee.trim();
+    payload.receivedDate = receivedDate || new Date().toISOString().slice(0, 10);
     onAnalyze(payload);
   };
 
@@ -102,22 +104,33 @@ export default function ContractUpload({ onAnalyze, loading, error, assigneeOpti
         </div>
       )}
 
-      {/* 담당자 입력 - 기존 이름 자동완성 */}
-      <div className="flex items-center gap-2">
-        <span className="text-slate-400 text-sm shrink-0">✏️ 담당자</span>
-        <input
-          type="text"
-          list="assignee-options"
-          value={assignee}
-          onChange={(e) => setAssignee(e.target.value)}
-          placeholder="이름 입력 (선택)"
-          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
-        />
-        <datalist id="assignee-options">
-          {assigneeOptions.map((name) => (
-            <option key={name} value={name} />
-          ))}
-        </datalist>
+      {/* 담당자 + 수신일 */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-slate-400 text-sm shrink-0">✏️ 담당자</span>
+          <input
+            type="text"
+            list="assignee-options"
+            value={assignee}
+            onChange={(e) => setAssignee(e.target.value)}
+            placeholder="이름 입력 (선택)"
+            className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
+          />
+          <datalist id="assignee-options">
+            {assigneeOptions.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-slate-400 text-sm shrink-0">📅 수신일</span>
+          <input
+            type="date"
+            value={receivedDate}
+            onChange={(e) => setReceivedDate(e.target.value)}
+            className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
+          />
+        </div>
       </div>
 
       {error && (
