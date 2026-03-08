@@ -175,13 +175,13 @@ def generate(records, output_path):
     ws1 = wb.create_sheet("① 기본로그")
     ws1.sheet_view.showGridLines = False
     ws1.freeze_panes = "A4"
-    set_widths(ws1, [12,28,18,16,8,8,18,14,14,14,12,20,15,15,15,10])
+    set_widths(ws1, [12,28,18,18,16,8,8,18,14,14,14,12,20,15,15,15,10])
 
-    title_row(ws1, 1, "📋  계약 기본 로그 — 전 계약 대상", 1, 16, C["navy"])
-    sub_row(ws1, 2, f"생성일: {today}  |  총 {total}건  |  R3 반드시 태깅·R2 선택·R1 생략 가능", 1, 16)
+    title_row(ws1, 1, "📋  계약 기본 로그 — 전 계약 대상", 1, 17, C["navy"])
+    sub_row(ws1, 2, f"생성일: {today}  |  총 {total}건  |  R3 반드시 태깅·R2 선택·R1 생략 가능", 1, 17)
     ws1.row_dimensions[3].height = 4
 
-    HEADERS1 = ["날짜","계약명","거래상대방","계약유형","등급(L)","등급(R)","리스크 유형",
+    HEADERS1 = ["날짜","계약명","우리측 당사자","거래상대방","계약유형","등급(L)","등급(R)","리스크 유형",
                 "계약금액\n(백만원)","구조변화\n(R3만)","담당자","완료여부","비고",
                 "Risk_Type_1\n(주요)","Risk_Type_2\n(부수)","Risk_Type_3\n(기타)","태깅완료"]
     header_row(ws1, 4, HEADERS1, height=32)
@@ -190,7 +190,9 @@ def generate(records, output_path):
         row = 5 + i
         ws1.row_dimensions[row].height = 18
         bg  = C["white"] if i%2==0 else C["slate_lt"]
-        vals = [r.get("date",""), r.get("title",""), r.get("counterparty",""), r.get("contract_type",""),
+        vals = [r.get("date",""), r.get("title",""),
+                r.get("our_party","") or "SK케미칼",
+                r.get("counterparty",""), r.get("contract_type",""),
                 None, None,
                 r.get("risk_type_1","") or "-",
                 r.get("amount","") or "-",
@@ -204,10 +206,10 @@ def generate(records, output_path):
                 "Y"]
         for col, val in enumerate(vals, 1):
             if val is None: continue
-            al = "center" if col in [1,5,6,8,11,16] else "left"
+            al = "center" if col in [1,6,7,9,12,17] else "left"
             data_cell(ws1, row, col, val, bg, align_h=al, size=9)
-        grade_cell(ws1, row, 5, r.get("lead_grade",""))
-        grade_cell(ws1, row, 6, r.get("risk_grade",""))
+        grade_cell(ws1, row, 6, r.get("lead_grade",""))
+        grade_cell(ws1, row, 7, r.get("risk_grade",""))
 
     ws1.sheet_properties.tabColor = C["navy"]
 
