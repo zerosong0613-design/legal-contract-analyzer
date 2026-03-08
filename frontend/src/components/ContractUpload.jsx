@@ -126,9 +126,12 @@ export default function ContractUpload({ onAnalyze, loading, error }) {
         className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold transition-colors shadow-sm"
       >
         {loading ? (
-          <span className="flex items-center justify-center gap-2">
-            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            분석 중...
+          <span className="flex flex-col items-center justify-center gap-1">
+            <span className="flex items-center gap-2">
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              분석 중...
+            </span>
+            <span className="text-xs text-white/70">처음 실행 시 서버 시작으로 최대 1분 소요될 수 있습니다</span>
           </span>
         ) : (
           "⚖️ 계약서 분석하기"
