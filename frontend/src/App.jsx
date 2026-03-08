@@ -44,20 +44,33 @@ function WelcomeBanner() {
       {/* 등급 설명 */}
       <div className="border-t border-slate-100 px-6 py-4 bg-slate-50">
         <p className="text-xs font-bold text-slate-500 mb-2">📌 등급 기준</p>
-        <div className="flex flex-wrap gap-2 text-xs">
-          {[
-            { badge: "L1", color: "bg-green-100 text-green-700", desc: "표준·반복 계약 → 48시간 내" },
-            { badge: "L2", color: "bg-amber-100 text-amber-700", desc: "비표준 조항 포함 → 5일 내" },
-            { badge: "L3", color: "bg-red-100 text-red-700",   desc: "복잡·고액·신규 유형 → 협의" },
-            { badge: "R1", color: "bg-green-100 text-green-700", desc: "균형 잡힌 조항 (저위험)" },
-            { badge: "R2", color: "bg-amber-100 text-amber-700", desc: "수정 필요 항목 존재 (중위험)" },
-            { badge: "R3", color: "bg-red-100 text-red-700",   desc: "즉각 협상 필요 (고위험)" },
-          ].map(({ badge, color, desc }) => (
-            <span key={badge} className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1">
-              <span className={`font-bold px-1.5 py-0.5 rounded ${color}`}>{badge}</span>
-              <span className="text-slate-500">{desc}</span>
-            </span>
-          ))}
+        <div className="space-y-2">
+          {/* 리드타임 */}
+          <div className="flex flex-wrap gap-2 text-xs">
+            {[
+              { badge: "L1", color: "bg-green-100 text-green-700", desc: "표준·반복 계약 → 48시간 내" },
+              { badge: "L2", color: "bg-amber-100 text-amber-700", desc: "비표준 조항 포함 → 5일 내" },
+              { badge: "L3", color: "bg-red-100 text-red-700",     desc: "복잡·고액·신규 유형 → 협의" },
+            ].map(({ badge, color, desc }) => (
+              <span key={badge} className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1">
+                <span className={`font-bold px-1.5 py-0.5 rounded ${color}`}>{badge}</span>
+                <span className="text-slate-500">{desc}</span>
+              </span>
+            ))}
+          </div>
+          {/* 리스크 */}
+          <div className="flex flex-wrap gap-2 text-xs">
+            {[
+              { badge: "R1", color: "bg-green-100 text-green-700", desc: "균형 잡힌 조항 (저위험)" },
+              { badge: "R2", color: "bg-amber-100 text-amber-700", desc: "수정 필요 항목 존재 (중위험)" },
+              { badge: "R3", color: "bg-red-100 text-red-700",     desc: "즉각 협상 필요 (고위험)" },
+            ].map(({ badge, color, desc }) => (
+              <span key={badge} className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1">
+                <span className={`font-bold px-1.5 py-0.5 rounded ${color}`}>{badge}</span>
+                <span className="text-slate-500">{desc}</span>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -122,6 +135,7 @@ export default function App() {
   };
 
   const removeRecord = (id) => updateRecords(records.filter((r) => r.id !== id));
+  const updateRecord = (newRecords) => updateRecords(newRecords);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -163,7 +177,7 @@ export default function App() {
           </div>
         )}
         {tab === "dashboard" && (
-          <Dashboard records={records} onRemove={removeRecord} />
+          <Dashboard records={records} onRemove={removeRecord} onUpdate={updateRecord} />
         )}
       </main>
     </div>
