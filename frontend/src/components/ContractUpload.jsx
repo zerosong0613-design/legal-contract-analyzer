@@ -105,16 +105,17 @@ export default function ContractUpload({ onAnalyze, loading, error, assigneeOpti
       )}
 
       {/* 담당자 + 수신일 */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-slate-400 text-sm shrink-0">✏️ 담당자</span>
+      <div className="grid grid-cols-2 gap-3">
+        {/* 담당자 */}
+        <div className="space-y-1">
+          <label className="text-xs font-semibold text-slate-500 pl-1">✏️ 담당자 <span className="font-normal text-slate-400">(선택)</span></label>
           <input
             type="text"
             list="assignee-options"
             value={assignee}
             onChange={(e) => setAssignee(e.target.value)}
-            placeholder="이름 입력 (선택)"
-            className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
+            placeholder="이름 입력 또는 선택"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
           />
           <datalist id="assignee-options">
             {assigneeOptions.map((name) => (
@@ -122,13 +123,14 @@ export default function ContractUpload({ onAnalyze, loading, error, assigneeOpti
             ))}
           </datalist>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-slate-400 text-sm shrink-0">📅 수신일</span>
+        {/* 수신일 */}
+        <div className="space-y-1">
+          <label className="text-xs font-semibold text-slate-500 pl-1">📅 수신일</label>
           <input
             type="date"
             value={receivedDate}
             onChange={(e) => setReceivedDate(e.target.value)}
-            className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
           />
         </div>
       </div>
