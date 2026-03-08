@@ -9,13 +9,6 @@ from datetime import datetime
 
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-try:
-    import holidays as _holidays
-    def _kr_holidays(year):
-        return _holidays.KR(years=year)
-except ImportError:
-    def _kr_holidays(year):
-        return {}
 from openpyxl.utils import get_column_letter
 from openpyxl.chart import BarChart, PieChart, Reference
 
@@ -45,23 +38,6 @@ def F(bold=False, color="1E293B", size=10, italic=False):
 
 def BG(hex_color):
     return PatternFill("solid", fgColor=hex_color)
-
-def working_days(d0, d1):
-    """d0(수신일)~d1(회신일) 사이 영업일수 (주말·한국공휴일 제외, 당일 미포함 익일부터 카운트)"""
-    from datetime import timedelta
-    if d1 < d0:
-        return 0
-    years = set(range(d0.year, d1.year + 1))
-    hols = {}
-    for y in years:
-        hols.update(_kr_holidays(y))
-    count = 0
-    cur = d0 + timedelta(days=1)
-    while cur <= d1:
-        if cur.weekday() < 5 and cur not in hols:
-            count += 1
-        cur += timedelta(days=1)
-    return count
 
 def AL(h="left", v="center", wrap=False):
     return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
@@ -151,12 +127,28 @@ def get_tags(records):
     return sorted(tags.items(), key=lambda x: -x[1])
 
 def get_assignees(records):
+    """전체 집계"""
     d = defaultdict(lambda: {"total":0,"r3":0,"amount":0})
     for r in records:
         a = r.get("assignee") or "미지정"
         d[a]["total"]  += 1
         d[a]["r3"]     += 1 if r.get("risk_grade")=="R3" else 0
         d[a]["amount"] += r.get("amount",0) or 0
+    return d
+
+def get_assignees_monthly(records):
+    """월별·담당자별 집계 {월: {담당자: {total,l1,l2,l3,r1,r2,r3}}}"""
+    d = defaultdict(lambda: defaultdict(lambda: {"total":0,"l1":0,"l2":0,"l3":0,"r1":0,"r2":0,"r3":0}))
+    for r in records:
+        date = r.get("date","")
+        if not date: continue
+        m = date[:7]
+        a = r.get("assignee") or "미지정"
+        d[m][a]["total"] += 1
+        lg = r.get("lead_grade","").lower()
+        rg = r.get("risk_grade","").lower()
+        if lg in ["l1","l2","l3"]: d[m][a][lg] += 1
+        if rg in ["r1","r2","r3"]: d[m][a][rg] += 1
     return d
 
 def quarter_of(ym):
@@ -199,71 +191,39 @@ def generate(records, output_path):
     ws1 = wb.create_sheet("① 기본로그")
     ws1.sheet_view.showGridLines = False
     ws1.freeze_panes = "A4"
-    set_widths(ws1, [12,28,18,18,16,8,8,18,12,10,8,10,14,12,20,15,15,15,10])
+    set_widths(ws1, [12,28,18,18,16,8,8,18,14,14,14,12,20,15,15,15,10])
 
-    LEAD_TARGET = {"L1": 2, "L2": 5, "L3": None}
-
-
-    title_row(ws1, 1, "📋  계약 기본 로그 — 전 계약 대상", 1, 20, C["navy"])
-    sub_row(ws1, 2, f"생성일: {today}  |  총 {total}건  |  R3 반드시 태깅·R2 선택·R1 생략 가능", 1, 20)
+    title_row(ws1, 1, "📋  계약 기본 로그 — 전 계약 대상", 1, 17, C["navy"])
+    sub_row(ws1, 2, f"생성일: {today}  |  총 {total}건  |  R3 반드시 태깅·R2 선택·R1 생략 가능", 1, 17)
     ws1.row_dimensions[3].height = 4
 
-    HEADERS1 = ["수신일","계약명","우리측 당사자","거래상대방","계약유형","등급(L)","등급(R)","리스크 유형",
-                "계약금액\n(백만원)","회신일","소요\n일수","목표\n일수","달성\n여부","구조변화\n(R3만)",
-                "담당자","Risk_Type_1\n(주요)","Risk_Type_2\n(부수)","Risk_Type_3\n(기타)","비고","태깅완료"]
+    HEADERS1 = ["날짜","계약명","우리측 당사자","거래상대방","계약유형","등급(L)","등급(R)","리스크 유형",
+                "계약금액\n(백만원)","구조변화\n(R3만)","담당자","완료여부","비고",
+                "Risk_Type_1\n(주요)","Risk_Type_2\n(부수)","Risk_Type_3\n(기타)","태깅완료"]
     header_row(ws1, 4, HEADERS1, height=32)
 
     for i, r in enumerate(records):
         row = 5 + i
         ws1.row_dimensions[row].height = 18
         bg  = C["white"] if i%2==0 else C["slate_lt"]
-        reply_date  = r.get("reply_date","")
-        recv_date   = r.get("date","")
-        lead_g      = r.get("lead_grade","")
-        target_days = LEAD_TARGET.get(lead_g)
-        # 소요 영업일수 계산 (주말·한국공휴일 제외)
-        elapsed = ""
-        achieved = ""
-        if reply_date and recv_date:
-            try:
-                from datetime import date as _d
-                d0 = _d.fromisoformat(recv_date)
-                d1 = _d.fromisoformat(reply_date)
-                elapsed = working_days(d0, d1)
-                if target_days is not None:
-                    achieved = "✅ 달성" if elapsed <= target_days else f"❌ {elapsed-target_days}일 초과"
-                else:
-                    achieved = "협의"
-            except:
-                pass
-
-        vals = [recv_date, r.get("title",""),
+        vals = [r.get("date",""), r.get("title",""),
                 r.get("our_party","") or "SK케미칼",
                 r.get("counterparty",""), r.get("contract_type",""),
                 None, None,
                 r.get("risk_type_1","") or "-",
                 r.get("amount","") or "-",
-                reply_date or "-",
-                elapsed if elapsed != "" else "-",
-                target_days if target_days else "협의",
-                achieved or "-",
                 r.get("note","") or "-",
                 r.get("assignee","") or "-",
+                "완료",
+                r.get("note","") or "-",
                 r.get("risk_type_1","") or "-",
                 r.get("risk_type_2","") or "-",
                 r.get("risk_type_3","") or "-",
-                r.get("memo","") or "-",
                 "Y"]
         for col, val in enumerate(vals, 1):
             if val is None: continue
-            al = "center" if col in [1,6,7,9,10,11,12,13,20] else "left"
-            c = data_cell(ws1, row, col, val, bg, align_h=al, size=9)
-            # 달성여부 색상
-            if col == 13 and achieved:
-                if "달성" in str(achieved):
-                    c.font = F(bold=True, color=C["green"], size=9)
-                elif "초과" in str(achieved):
-                    c.font = F(bold=True, color=C["red"], size=9)
+            al = "center" if col in [1,6,7,9,12,17] else "left"
+            data_cell(ws1, row, col, val, bg, align_h=al, size=9)
         grade_cell(ws1, row, 6, r.get("lead_grade",""))
         grade_cell(ws1, row, 7, r.get("risk_grade",""))
 
@@ -318,9 +278,8 @@ def generate(records, output_path):
     sub_row(ws3, 2, f"생성일: {today}  |  월별 계약 건수·등급 분포·금액 집계", 1, 13, "EFF6FF","1D4ED8")
     ws3.row_dimensions[3].height = 8
 
-    section_title(ws3, 4, "📊  누계 KPI", 1, 9, "1D4ED8")
     LEAD_TARGET = {"L1": 2, "L2": 5, "L3": None}
-    # 달성률 계산 (회신일 있는 건만)
+    # 달성률 계산
     replied = [r for r in records if r.get("reply_date") and r.get("date")]
     achieved_cnt = 0
     for r in replied:
@@ -330,13 +289,12 @@ def generate(records, output_path):
             d1 = _d.fromisoformat(r["reply_date"])
             td = LEAD_TARGET.get(r.get("lead_grade",""))
             wd = working_days(d0, d1)
-            if td is not None and wd <= td:
-                achieved_cnt += 1
-            elif td is None:
-                achieved_cnt += 1  # L3 협의건은 달성으로 집계
+            if td is not None and wd <= td: achieved_cnt += 1
+            elif td is None: achieved_cnt += 1
         except: pass
     achieve_rate = f"{achieved_cnt/len(replied)*100:.0f}%" if replied else "-"
 
+    section_title(ws3, 4, "📊  누계 KPI", 1, 9, "1D4ED8")
     kpi_items = [
         ("전체", total, C["indigo"]),
         ("L1", sum(1 for r in records if r.get("lead_grade")=="L1"), C["green"]),
@@ -346,12 +304,13 @@ def generate(records, output_path):
         ("R2", sum(1 for r in records if r.get("risk_grade")=="R2"), C["amber"]),
         ("R3", sum(1 for r in records if r.get("risk_grade")=="R3"), C["red"]),
         ("금액(백만)", sum(r.get("amount",0) or 0 for r in records), "0F172A"),
-        ("리드타임\n달성률", achieve_rate, C["green"]),
+        ("리드타임달성률", achieve_rate, C["green"]),
     ]
     for i, (lbl, val, color) in enumerate(kpi_items):
         kpi_card(ws3, 5, 6, i+1, lbl, val, color)
-    ws3.row_dimensions[7].height = 12
+    ws3.row_dimensions[7].height = 4
 
+    # ── 월별 상세 현황 (A~I열) ──
     section_title(ws3, 8, "📅  월별 상세 현황", 1, 9, "1D4ED8")
     header_row(ws3, 9, ["월","전체","L1","L2","L3","R1","R2","R3","금액(백만)"], bg="1D4ED8")
     sorted_months = sorted(monthly_agg.keys())
@@ -364,25 +323,44 @@ def generate(records, output_path):
             c = data_cell(ws3, row, col, val, bg, align_h="center")
             if col==8 and val>0: c.font = F(bold=True, color=C["red"])
 
+    # ── 차트: 월별 데이터 바로 아래 (A열 기준) ──
+    chart_start_row = 10 + len(sorted_months) + 2
     if sorted_months:
         bar = BarChart()
         bar.type = "col"
         bar.title = "월별 계약 건수"
         bar.style = 10
-        bar.width = 18
+        bar.width = 20
         bar.height = 12
         bar.add_data(Reference(ws3, min_col=2, max_col=8, min_row=9, max_row=9+len(sorted_months)), titles_from_data=True)
         bar.set_categories(Reference(ws3, min_col=1, min_row=10, max_row=9+len(sorted_months)))
-        ws3.add_chart(bar, f"A{12+len(sorted_months)}")
+        ws3.add_chart(bar, f"A{chart_start_row}")
 
-    section_title(ws3, 9, "👤  담당자별 현황", 10, 13, "1D4ED8")
-    header_row(ws3, 10, ["담당자","전체","R3건수","금액(백만)"], start_col=10, bg="1D4ED8")
+    # ── 담당자별 전체 현황 (차트 아래, A열) ──
+    asgn_start = chart_start_row + 18  # 차트 높이 확보
+    section_title(ws3, asgn_start, "👤  담당자별 누계 현황", 1, 9, "1D4ED8")
+    header_row(ws3, asgn_start+1, ["담당자","전체","L1","L2","L3","R1","R2","R3","금액(백만)"], bg="1D4ED8")
     for i, (a, v) in enumerate(sorted(assignees.items())):
-        row = 11 + i
+        row = asgn_start + 2 + i
         ws3.row_dimensions[row].height = 18
         bg = C["white"] if i%2==0 else C["slate_lt"]
-        for col, val in enumerate([a, v["total"], v["r3"], v["amount"]], 10):
-            data_cell(ws3, row, col, val, bg, align_h="left" if col==10 else "center")
+        for col, val in enumerate([a, v["total"], 0, 0, 0, 0, 0, v["r3"], v["amount"]], 1):
+            data_cell(ws3, row, col, val, bg, align_h="left" if col==1 else "center")
+
+    # ── 담당자별 월간 통계 (아래 섹션) ──
+    monthly_asgn = get_assignees_monthly(records)
+    masgn_start = asgn_start + 3 + len(assignees) + 2
+    section_title(ws3, masgn_start, "📅  담당자별 월간 현황", 1, 9, "1D4ED8")
+    header_row(ws3, masgn_start+1, ["월","담당자","전체","L1","L2","L3","R1","R2","R3"], bg="1D4ED8")
+    row_idx = masgn_start + 2
+    for m in sorted(monthly_asgn.keys()):
+        for a in sorted(monthly_asgn[m].keys()):
+            v = monthly_asgn[m][a]
+            ws3.row_dimensions[row_idx].height = 18
+            bg = C["white"] if row_idx % 2 == 0 else C["slate_lt"]
+            for col, val in enumerate([m, a, v["total"], v["l1"], v["l2"], v["l3"], v["r1"], v["r2"], v["r3"]], 1):
+                data_cell(ws3, row_idx, col, val, bg, align_h="left" if col in [1,2] else "center")
+            row_idx += 1
 
     ws3.sheet_properties.tabColor = "1D4ED8"
 
