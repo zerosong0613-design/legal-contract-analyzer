@@ -232,6 +232,8 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
     setExportError(null);
     try {
       const wb = XLSX.utils.book_new();
+      // ✅ Excel 열 때 수식 자동 재계산 강제
+      wb.Workbook = { CalcPr: { fullCalcOnLoad: 1 } };
       const today = new Date().toLocaleDateString("ko-KR");
 
       // ── ① 기본 로그 (핵심 열에 Excel 수식 삽입) ─────────────────
@@ -290,22 +292,23 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
 
         // K: 소요 영업일
         ws1[XLSX.utils.encode_cell({ r: sheetRow, c: 10 })] = {
-          t: "n",
-          f: `IF(AND(A${excelRow}<>"",J${excelRow}<>""),NETWORKDAYS(A${excelRow},J${excelRow})-1,"")`,
+          t: "n", f: `IF(AND(A${excelRow}<>"",J${excelRow}<>""),NETWORKDAYS(A${excelRow},J${excelRow})-1,"")`,
         };
         // L: 목표 영업일
         ws1[XLSX.utils.encode_cell({ r: sheetRow, c: 11 })] = {
-          t: "s",
-          f: `IF(F${excelRow}="L1",2,IF(F${excelRow}="L2",5,IF(F${excelRow}="L3","협의","")))`,
+          t: "n", f: `IF(F${excelRow}="L1",2,IF(F${excelRow}="L2",5,IF(F${excelRow}="L3","협의","")))`,
         };
         // M: 달성 여부
         ws1[XLSX.utils.encode_cell({ r: sheetRow, c: 12 })] = {
-          t: "s",
-          f: `IF(K${excelRow}="","미회신",IF(L${excelRow}="협의","협의완료",IF(K${excelRow}<=L${excelRow},"달성","❌ "&(K${excelRow}-L${excelRow})&"일 초과")))`,
+          t: "s", f: `IF(K${excelRow}="","미회신",IF(L${excelRow}="협의","협의완료",IF(K${excelRow}<=L${excelRow},"달성",IFERROR(K${excelRow}-L${excelRow},"")&"일 초과")))`,
         };
       });
 
       ws1["!cols"] = [10,28,16,16,14,8,8,20,10,10,10,10,14,14,20].map(w => ({ wch: w }));
+      // !ref 범위를 O열(index 14)까지 확장
+      const ws1Range = XLSX.utils.decode_range(ws1["!ref"] || "A1");
+      ws1Range.e.c = Math.max(ws1Range.e.c, 14);
+      ws1["!ref"] = XLSX.utils.encode_range(ws1Range);
       XLSX.utils.book_append_sheet(wb, ws1, "① 기본로그");
 
       // ── ② 월별 통계 (COUNTIFS/SUMIFS 수식으로 기본로그 참조) ──────
