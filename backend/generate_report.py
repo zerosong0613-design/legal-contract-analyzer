@@ -254,7 +254,7 @@ def generate(records, output_path):
     # ══════════════════════════════════════════════════════
     ws3 = wb.create_sheet("③ 월별 성과분석")
     ws3.sheet_view.showGridLines = False
-    set_widths(ws3, [12,8,8,8,8,8,8,14,2,22,10,10,10])
+    set_widths(ws3, [12,8,8,8,8,8,8,8,14,22,10,10,10])
 
     title_row(ws3, 1, "📈  월별 성과 분석", 1, 13, "1D4ED8")
     sub_row(ws3, 2, f"생성일: {today}  |  월별 계약 건수·등급 분포·금액 집계", 1, 13, "EFF6FF","1D4ED8")
@@ -314,7 +314,7 @@ def generate(records, output_path):
     # ══════════════════════════════════════════════════════
     ws4 = wb.create_sheet("④ 분기 성과분석")
     ws4.sheet_view.showGridLines = False
-    set_widths(ws4, [14,8,8,8,8,8,8,16,2,22,10,10,10])
+    set_widths(ws4, [14,8,8,8,8,8,8,8,16,22,10,10,10])
 
     title_row(ws4, 1, "📊  분기 성과 분석", 1, 13, "065F46")
     sub_row(ws4, 2, f"생성일: {today}  |  Q1~Q4 분기별 집계  |  리스크 태그 분포 포함", 1, 13, "ECFDF5","065F46")
@@ -372,7 +372,7 @@ def generate(records, output_path):
     # ══════════════════════════════════════════════════════
     ws5 = wb.create_sheet("⑤ 연간 성과분석")
     ws5.sheet_view.showGridLines = False
-    set_widths(ws5, [16,10,10,10,10,10,10,16,2,22,12,12,12])
+    set_widths(ws5, [16,10,10,10,10,10,10,10,16,22,12,12,12])
 
     title_row(ws5, 1, "🏆  연간 성과 분석", 1, 13, "6B21A8")
     sub_row(ws5, 2, f"생성일: {today}  |  연도별 집계  |  거래상대방·리스크 연간 트렌드", 1, 13, "FAF5FF","6B21A8")
