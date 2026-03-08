@@ -148,8 +148,13 @@ export default function App() {
     updateRecords(records.filter((r) => r.id !== id));
   };
 
+  // 단일 레코드(수정) 또는 전체 배열(복원) 모두 처리
   const updateRecord = (updated) => {
-    updateRecords(records.map((r) => r.id === updated.id ? updated : r));
+    if (Array.isArray(updated)) {
+      updateRecords(updated);
+    } else {
+      updateRecords(records.map((r) => r.id === updated.id ? updated : r));
+    }
   };
 
   return (
