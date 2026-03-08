@@ -15,7 +15,7 @@ function fileIcon(file) {
   return "📘";
 }
 
-export default function ContractUpload({ onAnalyze, loading, error }) {
+export default function ContractUpload({ onAnalyze, loading, error, assigneeOptions = [] }) {
   const [mode, setMode]         = useState("paste");
   const [text, setText]         = useState("");
   const [file, setFile]         = useState(null);
@@ -102,16 +102,22 @@ export default function ContractUpload({ onAnalyze, loading, error }) {
         </div>
       )}
 
-      {/* 담당자 입력 */}
+      {/* 담당자 입력 - 기존 이름 자동완성 */}
       <div className="flex items-center gap-2">
         <span className="text-slate-400 text-sm shrink-0">✏️ 담당자</span>
         <input
           type="text"
+          list="assignee-options"
           value={assignee}
           onChange={(e) => setAssignee(e.target.value)}
           placeholder="이름 입력 (선택)"
           className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
         />
+        <datalist id="assignee-options">
+          {assigneeOptions.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
       </div>
 
       {error && (
