@@ -5,40 +5,57 @@ import Dashboard from "./components/Dashboard";
 
 function WelcomeBanner() {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-      <div className="text-center space-y-1">
-        <div className="text-3xl">⚖️</div>
-        <h2 className="text-base font-bold text-slate-800">ContractLens 사용 방법</h2>
-        <p className="text-xs text-slate-400">계약서를 분석하고 리드타임·리스크를 자동으로 진단합니다</p>
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-5">
+      {/* 상단 컬러 배너 */}
+      <div className="bg-indigo-600 px-6 py-5">
+        <h2 className="text-white text-lg font-bold mb-1">ContractLens 사용 방법</h2>
+        <p className="text-indigo-200 text-sm">AI가 계약서를 분석하고 리드타임·리스크 등급을 자동으로 산정합니다</p>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+
+      {/* 3단계 안내 */}
+      <div className="grid grid-cols-3 divide-x divide-slate-100 px-2 py-4">
         {[
-          ["1️⃣", "계약서 입력", "텍스트 붙여넣기 또는 PDF·Word 파일 첨부"],
-          ["2️⃣", "AI 분석", "등급·리스크·당사자 자동 추출 후 수정 가능"],
-          ["3️⃣", "로그 저장", "대시보드에 누적, Excel로 성과 보고"],
-        ].map(([icon, title, desc]) => (
-          <div key={title} className="bg-slate-50 rounded-xl p-3 text-center border border-slate-100 space-y-1">
-            <div className="text-xl">{icon}</div>
-            <p className="text-xs font-bold text-slate-700">{title}</p>
-            <p className="text-xs text-slate-400 leading-relaxed">{desc}</p>
+          { step: "01", icon: "📄", title: "계약서 입력", desc: "텍스트를 붙여넣거나\nPDF·Word 파일 업로드" },
+          { step: "02", icon: "🤖", title: "AI 자동 분석", desc: "AI가 조항을 분석하고\n등급 산정 (10초)" },
+          { step: "03", icon: "📊", title: "결과 저장·보고서", desc: "로그 누적 후\nExcel 보고서 다운로드" },
+        ].map(({ step, icon, title, desc }) => (
+          <div key={step} className="px-4 text-center">
+            <div className="text-2xl mb-1">{icon}</div>
+            <div className="text-xs font-bold text-indigo-400 mb-0.5">STEP {step}</div>
+            <div className="text-sm font-bold text-slate-700 mb-1">{title}</div>
+            <p className="text-xs text-slate-400 whitespace-pre-line leading-relaxed">{desc}</p>
           </div>
         ))}
       </div>
-      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-        <p className="text-xs font-semibold text-slate-500 mb-2">📌 등급 기준</p>
-        <div className="flex flex-wrap gap-2">
-          {[
-            ["L1", "48시간·표준", "bg-green-100 text-green-800 border-green-300"],
-            ["L2", "5일·비표준", "bg-amber-100 text-amber-800 border-amber-300"],
-            ["L3", "협의·복잡", "bg-red-100 text-red-800 border-red-300"],
-            ["R1", "저위험", "bg-green-100 text-green-800 border-green-300"],
-            ["R2", "중위험", "bg-amber-100 text-amber-800 border-amber-300"],
-            ["R3", "고위험", "bg-red-100 text-red-800 border-red-300"],
-          ].map(([g, lbl, cls]) => (
-            <span key={g} className={`px-2 py-0.5 rounded-full border text-xs font-bold ${cls}`}>
-              {g} {lbl}
-            </span>
-          ))}
+
+      {/* 등급 설명 */}
+      <div className="border-t border-slate-100 px-6 py-4 bg-slate-50">
+        <p className="text-xs font-bold text-slate-500 mb-2">📌 등급 기준</p>
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2 text-xs">
+            {[
+              { badge: "L1", color: "bg-green-100 text-green-700", desc: "표준·반복 계약 → 48시간 내" },
+              { badge: "L2", color: "bg-amber-100 text-amber-700", desc: "비표준 조항 포함 → 5일 내" },
+              { badge: "L3", color: "bg-red-100 text-red-700",     desc: "복잡·고액·신규 유형 → 협의" },
+            ].map(({ badge, color, desc }) => (
+              <span key={badge} className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1">
+                <span className={`font-bold px-1.5 py-0.5 rounded ${color}`}>{badge}</span>
+                <span className="text-slate-500">{desc}</span>
+              </span>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            {[
+              { badge: "R1", color: "bg-green-100 text-green-700", desc: "균형 잡힌 조항 (저위험)" },
+              { badge: "R2", color: "bg-amber-100 text-amber-700", desc: "수정 필요 항목 존재 (중위험)" },
+              { badge: "R3", color: "bg-red-100 text-red-700",     desc: "즉각 협상 필요 (고위험)" },
+            ].map(({ badge, color, desc }) => (
+              <span key={badge} className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1">
+                <span className={`font-bold px-1.5 py-0.5 rounded ${color}`}>{badge}</span>
+                <span className="text-slate-500">{desc}</span>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -168,15 +185,15 @@ export default function App() {
 
       <main className="max-w-2xl mx-auto px-4 py-8">
         {tab === "analyze" && (
-          <div className="space-y-5">
+          <div className="space-y-0">
+            {!result && !loading && <WelcomeBanner />}
             <ContractUpload
                 onAnalyze={handleAnalyze}
                 loading={loading}
                 error={error}
                 assigneeOptions={[...new Set(records.map(r => r.assignee).filter(Boolean))].sort()}
               />
-            {!result && !loading && <WelcomeBanner />}
-            {result && <ContractResult result={result} onAddToLog={addToLog} initialAssignee={pendingAssignee} />}
+            {result && <div className="mt-5"><ContractResult result={result} onAddToLog={addToLog} initialAssignee={pendingAssignee} /></div>}
           </div>
         )}
         {tab === "dashboard" && (
