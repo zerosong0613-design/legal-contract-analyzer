@@ -152,12 +152,25 @@ def get_tags(records):
 
 def get_assignees(records):
     """전체 집계"""
-    d = defaultdict(lambda: {"total":0,"r3":0,"amount":0})
+    _LT = {"L1": 2, "L2": 5, "L3": None}
+    d = defaultdict(lambda: {"total":0,"r3":0,"amount":0,"replied":0,"achieved":0})
     for r in records:
         a = r.get("assignee") or "미지정"
         d[a]["total"]  += 1
         d[a]["r3"]     += 1 if r.get("risk_grade")=="R3" else 0
         d[a]["amount"] += r.get("amount",0) or 0
+        if r.get("reply_date") and r.get("date"):
+            try:
+                from datetime import date as _d
+                d0 = _d.fromisoformat(r["date"])
+                d1 = _d.fromisoformat(r["reply_date"])
+                td = _LT.get(r.get("lead_grade",""))
+                wd = working_days(d0, d1)
+                d[a]["replied"] += 1
+                if td is None or wd <= td:
+                    d[a]["achieved"] += 1
+            except:
+                pass
     return d
 
 def get_assignees_monthly(records):
@@ -190,9 +203,10 @@ def generate(records, output_path):
     total = len(records)
 
     # ── 집계 ────────────────────────────────────────────────
-    monthly_agg  = defaultdict(lambda:{"total":0,"l1":0,"l2":0,"l3":0,"r1":0,"r2":0,"r3":0,"amount":0})
-    quarterly    = defaultdict(lambda:{"total":0,"l1":0,"l2":0,"l3":0,"r1":0,"r2":0,"r3":0,"amount":0})
-    yearly       = defaultdict(lambda:{"total":0,"l1":0,"l2":0,"l3":0,"r1":0,"r2":0,"r3":0,"amount":0})
+    monthly_agg  = defaultdict(lambda:{"total":0,"l1":0,"l2":0,"l3":0,"r1":0,"r2":0,"r3":0,"amount":0,"replied":0,"achieved":0})
+    quarterly    = defaultdict(lambda:{"total":0,"l1":0,"l2":0,"l3":0,"r1":0,"r2":0,"r3":0,"amount":0,"replied":0,"achieved":0})
+    yearly       = defaultdict(lambda:{"total":0,"l1":0,"l2":0,"l3":0,"r1":0,"r2":0,"r3":0,"amount":0,"replied":0,"achieved":0})
+    _LEAD_TARGET_AGG = {"L1": 2, "L2": 5, "L3": None}
     for r in records:
         d = r.get("date","")
         if not d: continue
@@ -204,6 +218,20 @@ def generate(records, output_path):
             agg[key][r.get("lead_grade","").lower()] += 1
             agg[key][r.get("risk_grade","").lower()] += 1
             agg[key]["amount"] += r.get("amount",0) or 0
+        reply_date = r.get("reply_date","")
+        if reply_date and d:
+            try:
+                from datetime import date as _d
+                d0 = _d.fromisoformat(d)
+                d1 = _d.fromisoformat(reply_date)
+                td = _LEAD_TARGET_AGG.get(r.get("lead_grade",""))
+                wd = working_days(d0, d1)
+                for agg, key in [(monthly_agg, m),(quarterly, q),(yearly, y)]:
+                    agg[key]["replied"] += 1
+                    if td is None or wd <= td:
+                        agg[key]["achieved"] += 1
+            except:
+                pass
 
     all_tags   = get_tags(records)
     total_tags = sum(v for _,v in all_tags)
@@ -324,7 +352,7 @@ def generate(records, output_path):
     # ══════════════════════════════════════════════════════
     ws3 = wb.create_sheet("③ 월별 성과분석")
     ws3.sheet_view.showGridLines = False
-    set_widths(ws3, [12,8,8,8,8,8,8,8,14,22,10,10,10])
+    set_widths(ws3, [12,8,8,8,8,8,8,8,14,8,8,10,22,10,10,10])
 
     title_row(ws3, 1, "📈  월별 성과 분석", 1, 13, "1D4ED8")
     sub_row(ws3, 2, f"생성일: {today}  |  월별 계약 건수·등급 분포·금액 집계", 1, 13, "EFF6FF","1D4ED8")
@@ -364,16 +392,20 @@ def generate(records, output_path):
 
     # ── 월별 상세 현황 (A~I열) ──
     section_title(ws3, 8, "📅  월별 상세 현황", 1, 9, "1D4ED8")
-    header_row(ws3, 9, ["월","전체","L1","L2","L3","R1","R2","R3","금액(백만)"], bg="1D4ED8")
+    header_row(ws3, 9, ["월","전체","L1","L2","L3","R1","R2","R3","금액(백만)","회신완료","달성","달성률"], bg="1D4ED8")
     sorted_months = sorted(monthly_agg.keys())
     for i, m in enumerate(sorted_months):
         v   = monthly_agg[m]
         row = 10 + i
         ws3.row_dimensions[row].height = 18
         bg  = C["white"] if i%2==0 else C["slate_lt"]
-        for col, val in enumerate([m,v["total"],v["l1"],v["l2"],v["l3"],v["r1"],v["r2"],v["r3"],v["amount"]], 1):
+        rate_str = f"{v['achieved']/v['replied']*100:.0f}%" if v["replied"] > 0 else "-"
+        for col, val in enumerate([m,v["total"],v["l1"],v["l2"],v["l3"],v["r1"],v["r2"],v["r3"],v["amount"],v["replied"],v["achieved"],rate_str], 1):
             c = data_cell(ws3, row, col, val, bg, align_h="center")
             if col==8 and val>0: c.font = F(bold=True, color=C["red"])
+            if col==12 and isinstance(val, str) and val != "-":
+                pct = int(val.replace("%",""))
+                c.font = F(bold=True, color=C["green"] if pct >= 80 else C["amber"] if pct >= 50 else C["red"], size=9)
 
     # ── 차트: 월별 데이터 바로 아래 (A열 기준) ──
     chart_start_row = 10 + len(sorted_months) + 2
@@ -384,20 +416,24 @@ def generate(records, output_path):
         bar.style = 10
         bar.width = 20
         bar.height = 12
-        bar.add_data(Reference(ws3, min_col=2, max_col=8, min_row=9, max_row=9+len(sorted_months)), titles_from_data=True)
+        bar.add_data(Reference(ws3, min_col=2, max_col=9, min_row=9, max_row=9+len(sorted_months)), titles_from_data=True)
         bar.set_categories(Reference(ws3, min_col=1, min_row=10, max_row=9+len(sorted_months)))
         ws3.add_chart(bar, f"A{chart_start_row}")
 
     # ── 담당자별 전체 현황 (차트 아래, A열) ──
     asgn_start = chart_start_row + 28  # 차트 높이(12cm≈23행) + 여유
     section_title(ws3, asgn_start, "👤  담당자별 누계 현황", 1, 9, "1D4ED8")
-    header_row(ws3, asgn_start+1, ["담당자","전체","L1","L2","L3","R1","R2","R3","금액(백만)"], bg="1D4ED8")
+    header_row(ws3, asgn_start+1, ["담당자","전체","L1","L2","L3","R1","R2","R3","금액(백만)","회신완료","달성","달성률"], bg="1D4ED8")
     for i, (a, v) in enumerate(sorted(assignees.items())):
         row = asgn_start + 2 + i
         ws3.row_dimensions[row].height = 18
         bg = C["white"] if i%2==0 else C["slate_lt"]
-        for col, val in enumerate([a, v["total"], 0, 0, 0, 0, 0, v["r3"], v["amount"]], 1):
-            data_cell(ws3, row, col, val, bg, align_h="left" if col==1 else "center")
+        rate_str = f"{v['achieved']/v['replied']*100:.0f}%" if v["replied"] > 0 else "-"
+        for col, val in enumerate([a, v["total"], 0, 0, 0, 0, 0, v["r3"], v["amount"], v["replied"], v["achieved"], rate_str], 1):
+            c = data_cell(ws3, row, col, val, bg, align_h="left" if col==1 else "center")
+            if col==12 and isinstance(val, str) and val != "-":
+                pct = int(val.replace("%",""))
+                c.font = F(bold=True, color=C["green"] if pct >= 80 else C["amber"] if pct >= 50 else C["red"], size=9)
 
     # ── 담당자별 월간 통계 (아래 섹션) ──
     monthly_asgn = get_assignees_monthly(records)
