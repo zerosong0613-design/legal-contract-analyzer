@@ -117,9 +117,8 @@ export default function App() {
       { ...record, assignee: pendingAssignee || record.assignee || "", id: Date.now(), date: new Date().toISOString().slice(0, 10) },
     ];
     updateRecords(newRecords);
-    setResult(null);
+    // 저장 후 자동 이동 없음 — ContractResult에서 완료 메시지 표시
     setPendingAssignee("");
-    setTab("dashboard");
   };
 
   const removeRecord = (id) => updateRecords(records.filter((r) => r.id !== id));
