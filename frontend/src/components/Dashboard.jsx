@@ -29,6 +29,7 @@ function EditModal({ record, onSave, onClose }) {
 
         {[
           ["계약서 제목", "title"],
+          ["우리측 당사자", "our_party"],
           ["거래상대방", "counterparty"],
           ["계약 유형", "contract_type"],
           ["계약 기간", "duration"],
@@ -197,6 +198,7 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
                     <span className="text-xs text-slate-400">{r.date}</span>
                   </div>
                   <div className="flex gap-3 text-xs text-slate-500 flex-wrap">
+                    {r.our_party && <span>🏢 {r.our_party}</span>}
                     <span>👤 {r.counterparty}</span>
                     <span>🗂 {r.contract_type}</span>
                     {/* 금액 0이면 "-" 표시 */}
