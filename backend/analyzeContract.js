@@ -1,6 +1,6 @@
-const fs = require("fs");
-const path = require("path");
-const pdf = require("pdf-parse");
+const fs      = require("fs");
+const path    = require("path");
+const pdf     = require("pdf-parse");
 const mammoth = require("mammoth");
 const { openai } = require("./openaiClient");
 
@@ -9,17 +9,31 @@ const PROMPT_TEMPLATE = fs.readFileSync(
   "utf-8"
 );
 
-function isWordFile(mimetype, originalname) {
-  if (
-    mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-    mimetype === "application/msword"
-  ) return true;
-  // 확장자로 추가 체크 (브라우저 MIME 오인식 대응)
-  if (originalname) {
-    const ext = originalname.toLowerCase();
-    if (ext.endsWith(".docx") || ext.endsWith(".doc")) return true;
-  }
+function isDocx(mimetype, originalname) {
+  if (mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") return true;
+  if (originalname && originalname.toLowerCase().endsWith(".docx")) return true;
   return false;
+}
+
+function isLegacyDoc(mimetype, originalname) {
+  if (mimetype === "application/msword") return true;
+  if (originalname && originalname.toLowerCase().endsWith(".doc") &&
+      !originalname.toLowerCase().endsWith(".docx")) return true;
+  return false;
+}
+
+async function extractDocText(buffer) {
+  try {
+    const WordExtractor = require("word-extractor");
+    const extractor = new WordExtractor();
+    const extracted = await extractor.extract(buffer);
+    return extracted.getBody();
+  } catch (e) {
+    throw new Error(
+      `.doc(구형 Word) 파일 파싱 실패: ${e.message}\n` +
+      "word-extractor 패키지가 설치되어 있는지 확인하세요: npm install word-extractor"
+    );
+  }
 }
 
 async function analyzeContract({ fileBuffer, mimetype, originalname, text }) {
@@ -32,9 +46,16 @@ async function analyzeContract({ fileBuffer, mimetype, originalname, text }) {
     if (isPdf) {
       const parsed = await pdf(fileBuffer);
       contractText = parsed.text;
-    } else if (isWordFile(mimetype, originalname)) {
+
+    } else if (isDocx(mimetype, originalname)) {
+      // .docx — mammoth (Open XML)
       const result = await mammoth.extractRawText({ buffer: fileBuffer });
       contractText = result.value;
+
+    } else if (isLegacyDoc(mimetype, originalname)) {
+      // .doc — word-extractor (구형 바이너리)
+      contractText = await extractDocText(fileBuffer);
+
     } else {
       throw new Error("지원하지 않는 파일 형식입니다. PDF 또는 Word(.doc/.docx)만 가능합니다.");
     }
