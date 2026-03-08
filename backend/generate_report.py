@@ -9,6 +9,13 @@ from datetime import datetime
 
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+try:
+    import holidays as _holidays
+    def _kr_holidays(year):
+        return _holidays.KR(years=year)
+except ImportError:
+    def _kr_holidays(year):
+        return {}
 from openpyxl.utils import get_column_letter
 from openpyxl.chart import BarChart, PieChart, Reference
 
@@ -38,6 +45,23 @@ def F(bold=False, color="1E293B", size=10, italic=False):
 
 def BG(hex_color):
     return PatternFill("solid", fgColor=hex_color)
+
+def working_days(d0, d1):
+    """d0(수신일)~d1(회신일) 사이 영업일수 (주말·한국공휴일 제외, 당일 미포함 익일부터 카운트)"""
+    from datetime import timedelta
+    if d1 < d0:
+        return 0
+    years = set(range(d0.year, d1.year + 1))
+    hols = {}
+    for y in years:
+        hols.update(_kr_holidays(y))
+    count = 0
+    cur = d0 + timedelta(days=1)
+    while cur <= d1:
+        if cur.weekday() < 5 and cur not in hols:
+            count += 1
+        cur += timedelta(days=1)
+    return count
 
 def AL(h="left", v="center", wrap=False):
     return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
@@ -175,39 +199,71 @@ def generate(records, output_path):
     ws1 = wb.create_sheet("① 기본로그")
     ws1.sheet_view.showGridLines = False
     ws1.freeze_panes = "A4"
-    set_widths(ws1, [12,28,18,18,16,8,8,18,14,14,14,12,20,15,15,15,10])
+    set_widths(ws1, [12,28,18,18,16,8,8,18,12,10,8,10,14,12,20,15,15,15,10])
 
-    title_row(ws1, 1, "📋  계약 기본 로그 — 전 계약 대상", 1, 17, C["navy"])
-    sub_row(ws1, 2, f"생성일: {today}  |  총 {total}건  |  R3 반드시 태깅·R2 선택·R1 생략 가능", 1, 17)
+    LEAD_TARGET = {"L1": 2, "L2": 5, "L3": None}
+
+
+    title_row(ws1, 1, "📋  계약 기본 로그 — 전 계약 대상", 1, 20, C["navy"])
+    sub_row(ws1, 2, f"생성일: {today}  |  총 {total}건  |  R3 반드시 태깅·R2 선택·R1 생략 가능", 1, 20)
     ws1.row_dimensions[3].height = 4
 
-    HEADERS1 = ["날짜","계약명","우리측 당사자","거래상대방","계약유형","등급(L)","등급(R)","리스크 유형",
-                "계약금액\n(백만원)","구조변화\n(R3만)","담당자","완료여부","비고",
-                "Risk_Type_1\n(주요)","Risk_Type_2\n(부수)","Risk_Type_3\n(기타)","태깅완료"]
+    HEADERS1 = ["수신일","계약명","우리측 당사자","거래상대방","계약유형","등급(L)","등급(R)","리스크 유형",
+                "계약금액\n(백만원)","회신일","소요\n일수","목표\n일수","달성\n여부","구조변화\n(R3만)",
+                "담당자","Risk_Type_1\n(주요)","Risk_Type_2\n(부수)","Risk_Type_3\n(기타)","비고","태깅완료"]
     header_row(ws1, 4, HEADERS1, height=32)
 
     for i, r in enumerate(records):
         row = 5 + i
         ws1.row_dimensions[row].height = 18
         bg  = C["white"] if i%2==0 else C["slate_lt"]
-        vals = [r.get("date",""), r.get("title",""),
+        reply_date  = r.get("reply_date","")
+        recv_date   = r.get("date","")
+        lead_g      = r.get("lead_grade","")
+        target_days = LEAD_TARGET.get(lead_g)
+        # 소요 영업일수 계산 (주말·한국공휴일 제외)
+        elapsed = ""
+        achieved = ""
+        if reply_date and recv_date:
+            try:
+                from datetime import date as _d
+                d0 = _d.fromisoformat(recv_date)
+                d1 = _d.fromisoformat(reply_date)
+                elapsed = working_days(d0, d1)
+                if target_days is not None:
+                    achieved = "✅ 달성" if elapsed <= target_days else f"❌ {elapsed-target_days}일 초과"
+                else:
+                    achieved = "협의"
+            except:
+                pass
+
+        vals = [recv_date, r.get("title",""),
                 r.get("our_party","") or "SK케미칼",
                 r.get("counterparty",""), r.get("contract_type",""),
                 None, None,
                 r.get("risk_type_1","") or "-",
                 r.get("amount","") or "-",
+                reply_date or "-",
+                elapsed if elapsed != "" else "-",
+                target_days if target_days else "협의",
+                achieved or "-",
                 r.get("note","") or "-",
                 r.get("assignee","") or "-",
-                "완료",
-                r.get("note","") or "-",
                 r.get("risk_type_1","") or "-",
                 r.get("risk_type_2","") or "-",
                 r.get("risk_type_3","") or "-",
+                r.get("memo","") or "-",
                 "Y"]
         for col, val in enumerate(vals, 1):
             if val is None: continue
-            al = "center" if col in [1,6,7,9,12,17] else "left"
-            data_cell(ws1, row, col, val, bg, align_h=al, size=9)
+            al = "center" if col in [1,6,7,9,10,11,12,13,20] else "left"
+            c = data_cell(ws1, row, col, val, bg, align_h=al, size=9)
+            # 달성여부 색상
+            if col == 13 and achieved:
+                if "달성" in str(achieved):
+                    c.font = F(bold=True, color=C["green"], size=9)
+                elif "초과" in str(achieved):
+                    c.font = F(bold=True, color=C["red"], size=9)
         grade_cell(ws1, row, 6, r.get("lead_grade",""))
         grade_cell(ws1, row, 7, r.get("risk_grade",""))
 
@@ -262,7 +318,25 @@ def generate(records, output_path):
     sub_row(ws3, 2, f"생성일: {today}  |  월별 계약 건수·등급 분포·금액 집계", 1, 13, "EFF6FF","1D4ED8")
     ws3.row_dimensions[3].height = 8
 
-    section_title(ws3, 4, "📊  누계 KPI", 1, 8, "1D4ED8")
+    section_title(ws3, 4, "📊  누계 KPI", 1, 9, "1D4ED8")
+    LEAD_TARGET = {"L1": 2, "L2": 5, "L3": None}
+    # 달성률 계산 (회신일 있는 건만)
+    replied = [r for r in records if r.get("reply_date") and r.get("date")]
+    achieved_cnt = 0
+    for r in replied:
+        try:
+            from datetime import date as _d
+            d0 = _d.fromisoformat(r["date"])
+            d1 = _d.fromisoformat(r["reply_date"])
+            td = LEAD_TARGET.get(r.get("lead_grade",""))
+            wd = working_days(d0, d1)
+            if td is not None and wd <= td:
+                achieved_cnt += 1
+            elif td is None:
+                achieved_cnt += 1  # L3 협의건은 달성으로 집계
+        except: pass
+    achieve_rate = f"{achieved_cnt/len(replied)*100:.0f}%" if replied else "-"
+
     kpi_items = [
         ("전체", total, C["indigo"]),
         ("L1", sum(1 for r in records if r.get("lead_grade")=="L1"), C["green"]),
@@ -272,6 +346,7 @@ def generate(records, output_path):
         ("R2", sum(1 for r in records if r.get("risk_grade")=="R2"), C["amber"]),
         ("R3", sum(1 for r in records if r.get("risk_grade")=="R3"), C["red"]),
         ("금액(백만)", sum(r.get("amount",0) or 0 for r in records), "0F172A"),
+        ("리드타임\n달성률", achieve_rate, C["green"]),
     ]
     for i, (lbl, val, color) in enumerate(kpi_items):
         kpi_card(ws3, 5, 6, i+1, lbl, val, color)
