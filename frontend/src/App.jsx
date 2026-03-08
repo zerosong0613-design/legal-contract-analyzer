@@ -173,7 +173,7 @@ export default function App() {
             {/* 결과가 없을 때만 웰컴 배너 표시 */}
             {!result && !loading && <WelcomeBanner />}
             <ContractUpload onAnalyze={handleAnalyze} loading={loading} error={error} />
-            {result && <div className="mt-5"><ContractResult result={result} onAddToLog={addToLog} /></div>}
+            {result && <div className="mt-5"><ContractResult result={result} onAddToLog={addToLog} initialAssignee={pendingAssignee} /></div>}
           </div>
         )}
         {tab === "dashboard" && (
