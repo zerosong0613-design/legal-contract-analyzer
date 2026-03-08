@@ -53,8 +53,13 @@ function EditModal({ record, onSave, onClose, assigneeOptions = [] }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md space-y-4 p-6">
-        <h3 className="text-base font-bold text-slate-800">로그 수정</h3>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+        {/* 헤더 */}
+        <div className="px-6 pt-5 pb-2 shrink-0">
+          <h3 className="text-base font-bold text-slate-800">로그 수정</h3>
+        </div>
+        {/* 스크롤 영역 */}
+        <div className="overflow-y-auto px-6 pb-2 space-y-4 flex-1">
 
         {[
           ["계약서 제목", "title"],
@@ -127,7 +132,9 @@ function EditModal({ record, onSave, onClose, assigneeOptions = [] }) {
           </div>
         ))}
 
-        <div className="flex gap-2 pt-2">
+        </div>
+        {/* 하단 버튼 고정 */}
+        <div className="px-6 py-4 border-t border-slate-100 shrink-0 flex gap-2">
           <button onClick={onClose} className="flex-1 py-2 rounded-xl border border-slate-200 text-sm text-slate-500 hover:bg-slate-50">취소</button>
           <button onClick={() => onSave(draft)} className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold">저장</button>
         </div>
