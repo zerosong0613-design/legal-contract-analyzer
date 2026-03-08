@@ -337,7 +337,7 @@ def generate(records, output_path):
         ws3.add_chart(bar, f"A{chart_start_row}")
 
     # ── 담당자별 전체 현황 (차트 아래, A열) ──
-    asgn_start = chart_start_row + 18  # 차트 높이 확보
+    asgn_start = chart_start_row + 28  # 차트 높이(12cm≈23행) + 여유
     section_title(ws3, asgn_start, "👤  담당자별 누계 현황", 1, 9, "1D4ED8")
     header_row(ws3, asgn_start+1, ["담당자","전체","L1","L2","L3","R1","R2","R3","금액(백만)"], bg="1D4ED8")
     for i, (a, v) in enumerate(sorted(assignees.items())):
