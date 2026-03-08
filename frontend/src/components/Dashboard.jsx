@@ -1,5 +1,33 @@
 import { useState, useRef } from "react";
 
+const LEAD_TARGET = { L1: 2, L2: 5, L3: null };
+
+// 한국 공휴일 목록 (매년 업데이트 필요 — 서버에서 계산한 값을 표시하는 보조 함수)
+// 프론트엔드에서는 주말만 제외한 영업일로 표시 (공휴일은 Excel에서 정확히 반영됨)
+function workingDays(d0, d1) {
+  let count = 0;
+  const cur = new Date(d0);
+  cur.setDate(cur.getDate() + 1);
+  while (cur <= d1) {
+    const dow = cur.getDay();
+    if (dow !== 0 && dow !== 6) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
+
+function AchieveBadge({ recvDate, replyDate, leadGrade }) {
+  try {
+    const d0 = new Date(recvDate);
+    const d1 = new Date(replyDate);
+    const elapsed = workingDays(d0, d1);
+    const target = LEAD_TARGET[leadGrade];
+    if (target === null) return <span className="text-slate-400">🤝 협의완료 ({elapsed}영업일)</span>;
+    if (elapsed <= target) return <span className="text-green-600 font-semibold">✅ 달성 ({elapsed}/{target}영업일)</span>;
+    return <span className="text-red-500 font-semibold">❌ {elapsed-target}일 초과 ({elapsed}/{target}영업일)</span>;
+  } catch { return null; }
+}
+
 const GRADE_STYLE = {
   L1: "bg-green-100 text-green-800 border-green-300",
   L2: "bg-amber-100 text-amber-800 border-amber-300",
@@ -52,6 +80,16 @@ function EditModal({ record, onSave, onClose }) {
             type="number"
             value={draft.amount || 0}
             onChange={(e) => u("amount")(Number(e.target.value))}
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+          />
+        </div>
+
+        <div>
+          <p className="text-xs text-slate-400 font-semibold mb-1">회신일 (검토 완료 후 직접 입력)</p>
+          <input
+            type="date"
+            value={draft.reply_date || ""}
+            onChange={(e) => u("reply_date")(e.target.value)}
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           />
         </div>
@@ -201,9 +239,11 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
                     {r.our_party && <span>🏢 {r.our_party}</span>}
                     <span>👤 {r.counterparty}</span>
                     <span>🗂 {r.contract_type}</span>
-                    {/* 금액 0이면 "-" 표시 */}
                     <span>💰 {r.amount > 0 ? `${r.amount}백만원` : "-"}</span>
                     {r.assignee && <span>✏️ {r.assignee}</span>}
+                    {r.reply_date
+                      ? <AchieveBadge recvDate={r.date} replyDate={r.reply_date} leadGrade={r.lead_grade} />
+                      : <span className="text-slate-300">회신일 미입력</span>}
                     {r.memo && <span>📌 {r.memo}</span>}
                   </div>
                   {r.risk_type_1 && (
