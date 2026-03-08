@@ -147,6 +147,7 @@ function EditModal({ record, onSave, onClose, assigneeOptions = [] }) {
         {/* 하단 버튼 고정 */}
         <div className="px-6 py-4 border-t border-slate-100 shrink-0 flex gap-2">
           <button onClick={onClose} className="flex-1 py-2 rounded-xl border border-slate-200 text-sm text-slate-500 hover:bg-slate-50">취소</button>
+          {/* ✅ 수정: onSave에 단일 draft 객체만 전달 (App.jsx의 updateRecord가 단일 레코드를 받음) */}
           <button onClick={() => onSave(draft)} className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold">저장</button>
         </div>
       </div>
@@ -194,9 +195,9 @@ function OverdueBadge({ date, leadGrade, replyDate }) {
 }
 
 export default function Dashboard({ records, onRemove, onUpdate }) {
-  const [exporting, setExporting]       = useState(false);   // 빠른 Excel
-  const [formalExporting, setFormalExporting] = useState(false); // 정식 Excel
-  const [formalProgress, setFormalProgress]   = useState("");    // 진행 메시지
+  const [exporting, setExporting]       = useState(false);
+  const [formalExporting, setFormalExporting] = useState(false);
+  const [formalProgress, setFormalProgress]   = useState("");
   const [exportError, setExportError]   = useState(null);
   const [editTarget, setEditTarget]  = useState(null);
   const importRef = useRef();
@@ -208,7 +209,7 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
     if (byR[r.risk_grade] !== undefined) byR[r.risk_grade]++;
   });
 
-  // 영업일 계산 (주말 제외, 공휴일은 Excel 버전에서 정확히 반영)
+  // 영업일 계산 (주말 제외)
   const calcWorkingDays = (d0str, d1str) => {
     try {
       const d0 = new Date(d0str), d1 = new Date(d1str);
@@ -225,7 +226,7 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
 
   const LEAD_TARGET_MAP = { L1: 2, L2: 5, L3: null };
 
-  // Excel 내보내기 (클라이언트 직접 생성 — 즉시)
+  // Excel 내보내기
   const handleExport = () => {
     setExporting(true);
     setExportError(null);
@@ -333,7 +334,6 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
       ws3["!cols"] = [16,6,6,6,6,6,6,6,10,8,6,8].map(w => ({ wch: w }));
       XLSX.utils.book_append_sheet(wb, ws3, "③ 담당자별 현황");
 
-      // 다운로드
       const today2 = new Date().toISOString().slice(0, 10).replace(/-/g, "");
       XLSX.writeFile(wb, `법무팀_계약성과관리_${today2}.xlsx`);
     } catch (e) {
@@ -343,7 +343,7 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
     }
   };
 
-  // 정식 Excel 내보내기 (백엔드 Python — 공휴일 반영 + 스타일링)
+  // 정식 Excel 내보내기 (백엔드 Python)
   const handleFormalExport = async () => {
     setFormalExporting(true);
     setExportError(null);
@@ -357,7 +357,7 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
     const timers = STEPS.map(([ms, msg]) => setTimeout(() => setFormalProgress(msg), ms));
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 90000); // 90초
+      const timeout = setTimeout(() => controller.abort(), 90000);
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -421,7 +421,8 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
       {editTarget && (
         <EditModal
           record={editTarget}
-          onSave={(updated) => { onUpdate(records.map((r) => r.id === updated.id ? updated : r)); setEditTarget(null); }}
+          // ✅ 수정: onSave에 단일 updated 객체만 전달 → App.jsx의 updateRecord가 올바르게 처리
+          onSave={(updated) => { onUpdate(updated); setEditTarget(null); }}
           onClose={() => setEditTarget(null)}
           assigneeOptions={[...new Set(records.map(r => r.assignee).filter(Boolean))].sort()}
         />
@@ -506,9 +507,8 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
             </div>
           )}
 
-          {/* 버튼 영역 — 빠른 Excel / 정식 Excel */}
+          {/* 버튼 영역 */}
           <div className="flex gap-2">
-            {/* 빠른 Excel: 브라우저 즉시 생성 */}
             <button
               onClick={handleExport}
               disabled={exporting || formalExporting}
@@ -519,8 +519,6 @@ export default function Dashboard({ records, onRemove, onUpdate }) {
                 : <>⚡ 빠른 Excel<span className="text-white/70 text-xs font-normal">(즉시)</span></>
               }
             </button>
-
-            {/* 정식 Excel: 백엔드 Python — 공휴일 반영 + 차트 스타일 */}
             <button
               onClick={handleFormalExport}
               disabled={exporting || formalExporting}
