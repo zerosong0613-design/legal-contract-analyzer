@@ -4,7 +4,6 @@ const ACCEPTED_EXTENSIONS = [".pdf", ".doc", ".docx"];
 
 function isAcceptedFile(file) {
   if (!file) return false;
-  // 확장자로 체크 (MIME 타입이 틀려도 통과)
   const name = file.name.toLowerCase();
   return ACCEPTED_EXTENSIONS.some((ext) => name.endsWith(ext));
 }
@@ -17,10 +16,11 @@ function fileIcon(file) {
 }
 
 export default function ContractUpload({ onAnalyze, loading, error }) {
-  const [mode, setMode] = useState("paste");
-  const [text, setText] = useState("");
-  const [file, setFile] = useState(null);
+  const [mode, setMode]         = useState("paste");
+  const [text, setText]         = useState("");
+  const [file, setFile]         = useState(null);
   const [dragOver, setDragOver] = useState(false);
+  const [assignee, setAssignee] = useState("");
   const fileRef = useRef();
 
   const handleFile = (f) => {
@@ -35,7 +35,9 @@ export default function ContractUpload({ onAnalyze, loading, error }) {
   const handleSubmit = () => {
     if (mode === "paste" && !text.trim()) return;
     if (mode === "upload" && !file) return;
-    onAnalyze(mode === "paste" ? { text } : { file });
+    const payload = mode === "paste" ? { text } : { file };
+    if (assignee.trim()) payload.assignee = assignee.trim();
+    onAnalyze(payload);
   };
 
   return (
@@ -99,6 +101,18 @@ export default function ContractUpload({ onAnalyze, loading, error }) {
           )}
         </div>
       )}
+
+      {/* 담당자 입력 */}
+      <div className="flex items-center gap-2">
+        <span className="text-slate-400 text-sm shrink-0">✏️ 담당자</span>
+        <input
+          type="text"
+          value={assignee}
+          onChange={(e) => setAssignee(e.target.value)}
+          placeholder="이름 입력 (선택)"
+          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-colors"
+        />
+      </div>
 
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-red-600 text-sm">
