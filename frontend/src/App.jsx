@@ -3,6 +3,48 @@ import ContractUpload from "./components/ContractUpload";
 import ContractResult from "./components/ContractResult";
 import Dashboard from "./components/Dashboard";
 
+function WelcomeBanner() {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+      <div className="text-center space-y-1">
+        <div className="text-3xl">⚖️</div>
+        <h2 className="text-base font-bold text-slate-800">ContractLens 사용 방법</h2>
+        <p className="text-xs text-slate-400">계약서를 분석하고 리드타임·리스크를 자동으로 진단합니다</p>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          ["1️⃣", "계약서 입력", "텍스트 붙여넣기 또는 PDF·Word 파일 첨부"],
+          ["2️⃣", "AI 분석", "등급·리스크·당사자 자동 추출 후 수정 가능"],
+          ["3️⃣", "로그 저장", "대시보드에 누적, Excel로 성과 보고"],
+        ].map(([icon, title, desc]) => (
+          <div key={title} className="bg-slate-50 rounded-xl p-3 text-center border border-slate-100 space-y-1">
+            <div className="text-xl">{icon}</div>
+            <p className="text-xs font-bold text-slate-700">{title}</p>
+            <p className="text-xs text-slate-400 leading-relaxed">{desc}</p>
+          </div>
+        ))}
+      </div>
+      <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+        <p className="text-xs font-semibold text-slate-500 mb-2">📌 등급 기준</p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            ["L1", "48시간·표준", "bg-green-100 text-green-800 border-green-300"],
+            ["L2", "5일·비표준", "bg-amber-100 text-amber-800 border-amber-300"],
+            ["L3", "협의·복잡", "bg-red-100 text-red-800 border-red-300"],
+            ["R1", "저위험", "bg-green-100 text-green-800 border-green-300"],
+            ["R2", "중위험", "bg-amber-100 text-amber-800 border-amber-300"],
+            ["R3", "고위험", "bg-red-100 text-red-800 border-red-300"],
+          ].map(([g, lbl, cls]) => (
+            <span key={g} className={`px-2 py-0.5 rounded-full border text-xs font-bold ${cls}`}>
+              {g} {lbl}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const STORAGE_KEY = "contractlens_records";
 
 function loadRecords() {
@@ -89,17 +131,21 @@ export default function App() {
     updateRecords(records.filter((r) => r.id !== id));
   };
 
+  const updateRecord = (updated) => {
+    updateRecords(records.map((r) => r.id === updated.id ? updated : r));
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-6 flex items-center justify-between h-14 sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-3">
+        <button onClick={() => { setTab("analyze"); }} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-base">⚖️</div>
           <div>
             <span className="text-sm font-bold text-slate-800 tracking-tight">ContractLens</span>
             <span className="ml-2 text-xs text-slate-400 hidden sm:inline">계약서 AI 분석 · 리드타임 · 리스크 진단</span>
           </div>
-        </div>
+        </button>
         <nav className="flex gap-1">
           {[
             ["analyze", "📋 계약서 분석"],
@@ -123,12 +169,18 @@ export default function App() {
       <main className="max-w-2xl mx-auto px-4 py-8">
         {tab === "analyze" && (
           <div className="space-y-5">
-            <ContractUpload onAnalyze={handleAnalyze} loading={loading} error={error} />
-            {result && <ContractResult result={result} onAddToLog={addToLog} />}
+            <ContractUpload
+                onAnalyze={handleAnalyze}
+                loading={loading}
+                error={error}
+                assigneeOptions={[...new Set(records.map(r => r.assignee).filter(Boolean))].sort()}
+              />
+            {!result && !loading && <WelcomeBanner />}
+            {result && <ContractResult result={result} onAddToLog={addToLog} initialAssignee={pendingAssignee} />}
           </div>
         )}
         {tab === "dashboard" && (
-          <Dashboard records={records} onRemove={removeRecord} />
+          <Dashboard records={records} onRemove={removeRecord} onUpdate={updateRecord} />
         )}
       </main>
     </div>
